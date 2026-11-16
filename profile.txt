@@ -6,7 +6,7 @@
 
 name=Alejandro Meyer Contreras
 
-title1=Top 2% Pforzheim MDBM
+title1=Data Expert
 
 title2=Business Analyst
 
