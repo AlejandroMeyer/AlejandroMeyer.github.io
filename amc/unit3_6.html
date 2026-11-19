@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit3_6 · CCTV Traffic Intelligence Studio</title>
+<style>
+:root { --bg: #0b0f17; --panel: #131a26; --panel-2: #1a2333; --border: #263247; --text: #e6ebf3; --muted: #8a97ab;
+  --accent: #19d3a2; --accent-2: #4aa3ff; --warn: #ffb547; --danger: #ff5c7a; --radius: 12px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-weight: 400; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px 22px; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, #0f1622, #101b2a); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { font-size: 28px; }
+.brand h1 { margin: 0; font-size: 19px; }
+.brand p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.back { color: var(--accent-2); text-decoration: none; }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { padding: 4px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pill.ok { border-color: rgba(25, 211, 162, .5); color: var(--accent); }
+.pill.err { border-color: rgba(255, 92, 122, .6); color: var(--danger); }
+
+.layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 18px; padding: 18px 22px; }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } .side { order: 2; } }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.card h3 { margin: 0 0 10px; font-size: 14px; }
+.side { display: flex; flex-direction: column; gap: 14px; }
+
+/* KPI row */
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+@media (max-width: 1200px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.kpi small { display: block; color: var(--muted); font-size: 11.5px; letter-spacing: .4px; text-transform: uppercase; }
+.kpi b { display: block; font-size: 30px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.kpi span { color: var(--muted); font-size: 12px; }
+.kpi.total b { color: var(--accent-2); } .kpi.in b { color: var(--accent); } .kpi.out b { color: var(--warn); }
+.kpi.speed b { color: #c6a7ff; } .kpi.alert b { color: var(--danger); }
+.kpi b em { font-size: 14px; font-style: normal; color: var(--muted); margin-left: 4px; }
+
+/* Stage */
+.stage { position: relative; background: #05080d; border: 1px solid var(--border); border-radius: var(--radius);
+  width: 100%; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.stage:fullscreen { border-radius: 0; }
+#view { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stage-empty { position: absolute; text-align: center; color: var(--muted); padding: 20px; }
+.stage-empty .big { font-size: 60px; }
+.stage-msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(10, 14, 22, .9);
+  border: 1px solid var(--border); padding: 12px 18px; border-radius: 10px; max-width: 80%; text-align: center; }
+.stage-msg.err { border-color: var(--danger); color: #ffd0d9; }
+.live { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
+.live span { background: rgba(10, 14, 22, .82); border: 1px solid var(--border); border-radius: 7px; padding: 2px 9px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.live .dot { color: var(--danger); font-weight: 700; }
+
+.toolbar { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.toolbar .group { display: flex; gap: 8px; flex-wrap: wrap; }
+button { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent-2); }
+button.on { border-color: var(--accent); color: var(--accent); }
+button.primary { background: linear-gradient(90deg, var(--accent), var(--accent-2)); border: 0; color: #04121b; font-weight: 600; width: 100%; margin-top: 10px; }
+
+.panels { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; }
+@media (max-width: 800px) { .panels { grid-template-columns: 1fr; } }
+#chart { width: 100%; display: block; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+td:not(:first-child), th:not(:first-child) { text-align: right; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+.log { max-height: 220px; overflow-y: auto; }
+.log td { font-size: 13px; }
+.fast { color: var(--danger); font-weight: 600; }
+
+label { display: flex; justify-content: space-between; margin: 10px 0 5px; color: var(--muted); font-size: 12.5px; }
+label b { color: var(--text); }
+input[type=text] { width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+label.check { justify-content: flex-start; align-items: center; gap: 8px; color: var(--text); font-size: 13.5px; margin: 7px 0; }
+.presets { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.presets button { text-align: left; font-size: 12.5px; display: flex; justify-content: space-between; }
+.presets button.active { border-color: var(--accent); }
+.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); }
+.chip.on { color: #06101a; border-color: transparent; font-weight: 600; }
+.file { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.file u { cursor: pointer; color: var(--accent-2); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🚦</span>
+    <div>
+      <h1>unit3_6 · CCTV Traffic Intelligence Studio</h1>
+      <p>Extra Credit #3-6 · YOLO26n + tracking · vehicle counting, heatmap and speed estimation in your browser</p>
+    </div>
+  </div>
+  <a class="back" href="../unit.html?unit=3">← Back to Unit 3</a>
+  <div class="pills">
+    <span class="pill" id="pillModel">Model: loading…</span>
+    <span class="pill" id="pillBackend">Backend: –</span>
+    <span class="pill" id="pillInfer">– ms</span>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ============ Sidebar ============ -->
+  <aside class="side">
+    <div class="card">
+      <h3>📡 CCTV feed source</h3>
+      <label>Live camera URL (MJPEG)</label>
+      <input id="cctvUrl" type="text" value="https://cctv.klcg.gov.tw/facd4662">
+      <div class="presets" id="presets"></div>
+      <button class="primary" id="btnConnect">Connect / switch feed</button>
+      <p class="file">Camera offline? Test with a traffic video: <u id="pickFile">choose a file</u><input type="file" id="fileInput" accept="video/*" hidden></p>
+    </div>
+
+    <div class="card">
+      <h3>📏 Counting line &amp; geometry</h3>
+      <label>Counting line position (Y) <b id="lineYVal"></b></label>
+      <input type="range" id="lineY" min="0.15" max="0.9" step="0.01" value="0.62">
+      <label>Scale near the camera <b id="mppVal"></b></label>
+      <input type="range" id="mpp" min="0.01" max="0.15" step="0.005" value="0.04">
+      <label>Perspective (far / near) <b id="farVal"></b></label>
+      <input type="range" id="far" min="1" max="5" step="0.25" value="2.5">
+      <label>Speed limit <b id="limitVal"></b></label>
+      <input type="range" id="limit" min="10" max="100" step="5" value="40">
+      <p class="hint">Speed = how far a vehicle's wheels move per second × metres per pixel. Pixels further from the camera cover more metres, so the scale grows towards the top of the picture by the perspective factor.</p>
+    </div>
+
+    <div class="card">
+      <h3>🔥 Traffic density heatmap</h3>
+      <label class="check"><input type="checkbox" id="optHeat" checked> Show heatmap overlay</label>
+      <label>Opacity <b id="heatOpVal"></b></label>
+      <input type="range" id="heatOp" min="0.1" max="1" step="0.05" value="0.7">
+      <label>Memory <b id="heatMemVal"></b></label>
+      <input type="range" id="heatMem" min="0" max="1" step="0.05" value="0.75">
+      <label class="check"><input type="checkbox" id="optTrails" checked> Motion trails</label>
+      <label class="check"><input type="checkbox" id="optBoxes" checked> Boxes, IDs &amp; speed labels</label>
+    </div>
+
+    <div class="card">
+      <h3>🚗 Detection</h3>
+      <label>Confidence <b id="confVal"></b></label>
+      <input type="range" id="conf" min="0.1" max="0.9" step="0.05" value="0.3">
+      <label>Vehicle classes</label>
+      <div class="chips" id="chips"></div>
+    </div>
+  </aside>
+
+  <!-- ============ Main ============ -->
+  <section>
+    <div class="kpis">
+      <div class="kpi total"><small>Total vehicles counted</small><b id="kTotal">0</b><span>crossed the counting line</span></div>
+      <div class="kpi in"><small>Inflow ↓ (down)</small><b id="kIn">0</b><span>moving towards the camera</span></div>
+      <div class="kpi out"><small>Outflow ↑ (up)</small><b id="kOut">0</b><span>moving away from the camera</span></div>
+      <div class="kpi speed"><small>Average road speed</small><b><span id="kSpeed" style="font-size:inherit;color:inherit">–</span><em>km/h</em></b><span>moving vehicles right now</span></div>
+      <div class="kpi alert"><small>Speeding alerts</small><b id="kFast">0</b><span id="kFastHint">over the speed limit</span></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="view"></canvas>
+      <div class="stage-empty" id="stageEmpty"><div class="big">🚦</div><p>Loading the model, then connecting to the Keelung City live traffic camera…</p></div>
+      <div class="live hidden" id="live"><span class="dot">● LIVE CCTV</span><span>Active: <b id="lActive">0</b></span><span><b id="lFps">0</b> FPS</span></div>
+      <div class="stage-msg hidden" id="stageMsg"></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="group">
+        <button id="btnDetect" class="on">● Analysing</button>
+        <button id="btnReset">↺ Reset counters</button>
+      </div>
+      <div class="group">
+        <button id="btnSnap">📷 Snapshot</button>
+        <button id="btnCsv">⬇ Export CSV</button>
+        <button id="btnFull">⛶ Fullscreen</button>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="card">
+        <h3>Traffic flow <span class="muted">· vehicles on screen and crossings per minute</span></h3>
+        <canvas id="chart" height="140"></canvas>
+      </div>
+      <div class="card">
+        <h3>By vehicle type</h3>
+        <table>
+          <thead><tr><th>Type</th><th>Now</th><th>↓ In</th><th>↑ Out</th><th>Avg km/h</th></tr></thead>
+          <tbody id="typeBody"><tr><td colspan="5" class="muted">No vehicles yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>Crossing log <span class="muted" id="logCount"></span></h3>
+      <div class="log">
+        <table>
+          <thead><tr><th>Time</th><th>ID</th><th>Type</th><th>Direction</th><th>Speed</th></tr></thead>
+          <tbody id="logBody"><tr><td colspan="5" class="muted">Every vehicle that crosses the line appears here.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<video id="video" playsinline muted class="hidden"></video>
+<img id="mjpeg" class="hidden" alt="">
+
+<script>
+"use strict";
+/* CCTV Traffic Intelligence Studio: YOLO26n (ONNX Runtime Web) + a small IoU tracker,
+   line counting, a decaying traffic-density heatmap and perspective-aware speed estimation. */
+
+const MODEL_URL = "assets/models/yolo26n.onnx", INPUT = 640;
+const ORT_CDN = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+const VEHICLES = { 1: ["bicycle", "#7ee081"], 2: ["car", "#4aa3ff"], 3: ["motorcycle", "#ffb547"], 5: ["bus", "#c6a7ff"], 7: ["truck", "#ff7eb6"] };
+const PRESETS = [{ name: "Keelung City · facd4662", url: "https://cctv.klcg.gov.tw/facd4662" }];
+
+const $ = (id) => document.getElementById(id);
+const view = $("view"), vctx = view.getContext("2d");
+const videoEl = $("video"), mjpegEl = $("mjpeg");
+
+const state = {
+  session: null, backend: null, source: null, analysing: true,
+  conf: 0.3, enabled: new Set([1, 2, 3, 5, 7]),
+  lineY: 0.62, mpp: 0.04, far: 2.5, limit: 40,
+  dets: [], inferMs: 0, heat: null, history: [], avgSpeed: null,
+};
+
+/* ================= Model ================= */
+async function loadModel() {
+  ort.env.wasm.wasmPaths = ORT_CDN;
+  for (const ep of navigator.gpu ? ["webgpu", "wasm"] : ["wasm"]) {
+    try {
+      const s = await ort.InferenceSession.create(MODEL_URL, { executionProviders: [ep], graphOptimizationLevel: "all" });
+      await s.run({ [s.inputNames[0]]: new ort.Tensor("float32", new Float32Array(3 * INPUT * INPUT), [1, 3, INPUT, INPUT]) });
+      state.session = s; state.backend = ep;
+      setPill("pillModel", "Model: yolo26n ✓", "ok");
+      setPill("pillBackend", "Backend: " + ep.toUpperCase(), "ok");
+      return;
+    } catch (e) { console.warn(ep, e); }
+  }
+  setPill("pillModel", "Model: failed", "err");
+  showMsg("Could not load the YOLO model.", true);
+}
+
+/* ================= Pre / post processing ================= */
+const pre = document.createElement("canvas"); pre.width = pre.height = INPUT;
+const pctx = pre.getContext("2d", { willReadFrequently: true });
+const input = new Float32Array(3 * INPUT * INPUT);
+function letterbox(src, w, h) {
+  const scale = Math.min(INPUT / w, INPUT / h), nw = Math.round(w * scale), nh = Math.round(h * scale);
+  const padX = Math.floor((INPUT - nw) / 2), padY = Math.floor((INPUT - nh) / 2);
+  pctx.fillStyle = "rgb(114,114,114)"; pctx.fillRect(0, 0, INPUT, INPUT);
+  pctx.drawImage(src, 0, 0, w, h, padX, padY, nw, nh);
+  const px = pctx.getImageData(0, 0, INPUT, INPUT).data, N = INPUT * INPUT;
+  for (let i = 0, j = 0; i < N; i++, j += 4) { input[i] = px[j] / 255; input[N + i] = px[j + 1] / 255; input[2 * N + i] = px[j + 2] / 255; }
+  return { scale, padX, padY };
+}
+// YOLO26 end-to-end output [1, 300, 6] = x1, y1, x2, y2, score, class (no NMS needed)
+function decode(out, lb, w, h) {
+  const d = out.data, res = [];
+  for (let i = 0; i < out.dims[1]; i++) {
+    const o = i * 6, score = d[o + 4], cls = Math.round(d[o + 5]);
+    if (score < state.conf || !state.enabled.has(cls)) continue;
+    const x1 = (d[o] - lb.padX) / lb.scale, y1 = (d[o + 1] - lb.padY) / lb.scale;
+    const x2 = (d[o + 2] - lb.padX) / lb.scale, y2 = (d[o + 3] - lb.padY) / lb.scale;
+    res.push({ x1: Math.max(0, x1), y1: Math.max(0, y1), x2: Math.min(w, x2), y2: Math.min(h, y2), score, cls });
+  }
+  // A vehicle is sometimes reported as both car and truck: keep the more confident box
+  res.sort((a, b) => b.score - a.score);
+  return res.filter((a, i) => !res.slice(0, i).some((b) => iou(a, b) > 0.7));
+}
+function iou(a, b) {
+  const iw = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)), ih = Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  const inter = iw * ih, u = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1) - inter;
+  return u > 0 ? inter / u : 0;
+}
+const foot = (b) => [(b.x1 + b.x2) / 2, b.y2];   // ground contact point
+
+/* ================= Speed geometry ================= */
+// metres per pixel at image row y: state.mpp at the bottom, state.far × larger at the top
+function mppAt(y, h) { return state.mpp * (1 + (state.far - 1) * (1 - y / h)); }
+
+/* ================= Tracker + counting + speed ================= */
+const tracker = {
+  nextId: 1, tracks: [], down: {}, up: {}, log: [], speeding: 0, speedSum: {}, speedN: {},
+  reset() { this.nextId = 1; this.tracks = []; this.down = {}; this.up = {}; this.log = []; this.speeding = 0; this.speedSum = {}; this.speedN = {}; },
+  update(dets, t, w, h) {
+    const pairs = [];
+    this.tracks.forEach((tr, ti) => dets.forEach((d, di) => {
+      const ov = iou(tr.box, d), [ax, ay] = foot(tr.box), [bx, by] = foot(d);
+      const dist = Math.hypot(ax - bx, ay - by), diag = Math.hypot(tr.box.x2 - tr.box.x1, tr.box.y2 - tr.box.y1);
+      if (ov > 0.1 || dist < diag * 0.7) pairs.push([ov - dist / (diag * 10 + 1), ti, di]);
+    }));
+    pairs.sort((a, b) => b[0] - a[0]);
+    const usedT = new Set(), usedD = new Set();
+    for (const [, ti, di] of pairs) {
+      if (usedT.has(ti) || usedD.has(di)) continue;
+      usedT.add(ti); usedD.add(di);
+      const tr = this.tracks[ti], d = dets[di];
+      tr.box = d; tr.missed = 0; tr.hits++;
+      tr.votes[d.cls] = (tr.votes[d.cls] || 0) + 1;
+      tr.cls = +Object.entries(tr.votes).sort((a, b) => b[1] - a[1])[0][0];
+      tr.path.push([...foot(d), t]); if (tr.path.length > 40) tr.path.shift();
+      this.speed(tr, h);
+      if (tr.hits >= 3) this.cross(tr, w, h, t);
+      d.track = tr;
+    }
+    this.tracks.forEach((tr, ti) => { if (!usedT.has(ti)) tr.missed++; });
+    dets.forEach((d, di) => {
+      if (usedD.has(di)) return;
+      const tr = { id: this.nextId++, cls: d.cls, votes: { [d.cls]: 1 }, box: d, hits: 1, missed: 0, path: [[...foot(d), t]], speed: null, side: null, counted: false };
+      this.tracks.push(tr); d.track = tr;
+    });
+    this.tracks = this.tracks.filter((tr) => tr.missed <= (tr.hits >= 3 ? 12 : 2));
+  },
+  // Speed from the ground-point displacement over the last ~1 s of the track
+  speed(tr, h) {
+    const p = tr.path, last = p[p.length - 1];
+    let i = p.length - 1;
+    while (i > 0 && last[2] - p[i - 1][2] <= 1200) i--;
+    const first = p[i], dt = (last[2] - first[2]) / 1000;
+    if (dt < 0.35) return;
+    let metres = 0;
+    for (let k = i + 1; k < p.length; k++) {
+      const dx = p[k][0] - p[k - 1][0], dy = p[k][1] - p[k - 1][1];
+      metres += Math.hypot(dx, dy) * mppAt((p[k][1] + p[k - 1][1]) / 2, h);
+    }
+    // Ignore jitter of parked vehicles: net displacement must be meaningful
+    const net = Math.hypot(last[0] - first[0], last[1] - first[1]) * mppAt((last[1] + first[1]) / 2, h);
+    const kmh = net < 0.4 ? 0 : (Math.min(metres, net * 1.3) / dt) * 3.6;
+    tr.speed = tr.speed == null ? kmh : tr.speed * 0.6 + kmh * 0.4;
+  },
+  cross(tr, w, h, t) {
+    const y = tr.box.y2, side = Math.sign(y - state.lineY * h);
+    if (!tr.counted && tr.side !== null && side !== 0 && side !== tr.side) {
+      const dir = side > 0 ? "down" : "up";
+      this[dir][tr.cls] = (this[dir][tr.cls] || 0) + 1;
+      tr.counted = true; flashUntil = performance.now() + 350;
+      const kmh = tr.speed == null ? null : Math.round(tr.speed);
+      if (kmh != null && kmh > 1) { this.speedSum[tr.cls] = (this.speedSum[tr.cls] || 0) + kmh; this.speedN[tr.cls] = (this.speedN[tr.cls] || 0) + 1; }
+      const fast = kmh != null && kmh > state.limit;
+      if (fast) this.speeding++;
+      this.log.unshift({ time: new Date(), id: tr.id, type: VEHICLES[tr.cls][0], dir, kmh, fast });
+      if (this.log.length > 500) this.log.pop();
+      crossTimes.push(t);
+      renderLog();
+    }
+    if (side !== 0) tr.side = side;
+  },
+};
+let flashUntil = 0;
+const crossTimes = [];
+
+/* ================= Heatmap ================= */
+const HW = 128, HH = 72, heatCanvas = document.createElement("canvas");
+heatCanvas.width = HW; heatCanvas.height = HH;
+const hctx = heatCanvas.getContext("2d");
+let heatT = 0;
+// Half-life of the heat in seconds (time based, so it behaves the same at any frame rate)
+const heatHalfLife = () => 3 * Math.pow(60, +$("heatMem").value);   // memory 0 → 3 s … 1 → 180 s
+function updateHeat(dets, w, h) {
+  if (!state.heat) state.heat = new Float32Array(HW * HH);
+  const now = performance.now(), dt = heatT ? (now - heatT) / 1000 : 0; heatT = now;
+  const H = state.heat, decay = Math.pow(0.5, dt / heatHalfLife());
+  for (let i = 0; i < H.length; i++) H[i] *= decay;
+  for (const d of dets) {
+    const [fx, fy] = foot(d);
+    const gx = Math.floor((fx / w) * HW), gy = Math.floor(((fy + d.y1) / 2 / h) * HH);   // centre-bottom of the vehicle
+    const r = Math.max(2, Math.round(((d.x2 - d.x1) / w) * HW * 0.35));
+    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+      const X = gx + x, Y = gy + y;
+      if (X >= 0 && Y >= 0 && X < HW && Y < HH) H[Y * HW + X] += Math.exp(-(x * x + y * y) / (r * r * 0.5));
+    }
+  }
+  let max = 1; for (let i = 0; i < H.length; i++) if (H[i] > max) max = H[i];
+  const img = hctx.createImageData(HW, HH), lmax = Math.log1p(max);
+  for (let i = 0; i < H.length; i++) {
+    // Log scale: a parked car keeps adding heat, linear scaling would hide the lanes vehicles drive through
+    const v = Math.min(1, Math.log1p(H[i]) / lmax);
+    img.data[i * 4] = 255 * Math.min(1, Math.max(0, 2 * v - 0.5));
+    img.data[i * 4 + 1] = 255 * Math.min(1, 2 * v) * (v < 0.75 ? 1 : (1 - v) * 4);
+    img.data[i * 4 + 2] = 255 * Math.max(0, 1 - 2.5 * v);
+    img.data[i * 4 + 3] = v < 0.05 ? 0 : 210 * Math.sqrt(v);
+  }
+  hctx.putImageData(img, 0, 0);
+}
+
+/* ================= Sources ================= */
+function size() { const s = state.source; return !s ? [0, 0] : s.kind === "cctv" ? [s.el.naturalWidth, s.el.naturalHeight] : [s.el.videoWidth, s.el.videoHeight]; }
+function ready() { const s = state.source; return !!s && (s.kind === "cctv" ? s.el.complete && s.el.naturalWidth > 0 : s.el.readyState >= 2 && s.el.videoWidth > 0); }
+function stopSource() {
+  const s = state.source; if (!s) return;
+  if (s.kind === "cctv") mjpegEl.removeAttribute("src");
+  else { videoEl.pause(); videoEl.removeAttribute("src"); videoEl.load(); URL.revokeObjectURL(s.url); }
+  state.source = null; state.dets = []; state.heat = null; state.history = []; crossTimes.length = 0;
+  tracker.reset(); renderAll();
+}
+function connect(url) {
+  if (!url) return;
+  stopSource();
+  showMsg("Connecting to the live camera…");
+  $("stageEmpty").classList.add("hidden");
+  state.source = { kind: "cctv", el: mjpegEl, label: url, waiting: true };
+  mjpegEl.onerror = () => showMsg("Could not open this camera. It must be an MJPEG / JPEG link that allows browser access (CORS).", true);
+  mjpegEl.crossOrigin = "anonymous";
+  mjpegEl.src = url;
+  document.querySelectorAll("#presets button").forEach((b) => b.classList.toggle("active", b.dataset.url === url));
+  $("live").querySelector(".dot").textContent = "● LIVE CCTV";
+}
+function playFile(file) {
+  stopSource();
+  $("stageEmpty").classList.add("hidden"); hideMsg();
+  const url = URL.createObjectURL(file);
+  state.source = { kind: "video", el: videoEl, label: file.name, url };
+  videoEl.src = url; videoEl.loop = true; videoEl.play();
+  $("live").querySelector(".dot").textContent = "▶ VIDEO FILE";
+}
+
+/* ================= Inference loop (timer based: keeps counting in background tabs) ================= */
+async function inferLoop() {
+  for (;;) {
+    const s = state.source;
+    let worked = false;
+    if (state.session && state.analysing && ready()) {
+      worked = true;
+      const [w, h] = size(), t = performance.now();
+      try {
+        const lb = letterbox(s.el, w, h);
+        const res = await state.session.run({ [state.session.inputNames[0]]: new ort.Tensor("float32", input, [1, 3, INPUT, INPUT]) });
+        const dets = decode(res[state.session.outputNames[0]], lb, w, h);
+        tracker.update(dets, t, w, h);
+        updateHeat(dets, w, h);
+        state.dets = dets;
+        state.inferMs = state.inferMs ? state.inferMs * 0.8 + (performance.now() - t) * 0.2 : performance.now() - t;
+        const moving = tracker.tracks.filter((tr) => tr.missed === 0 && tr.hits >= 3 && tr.speed > 2);
+        const avg = moving.length ? moving.reduce((a, tr) => a + tr.speed, 0) / moving.length : null;
+        state.avgSpeed = avg == null ? state.avgSpeed : state.avgSpeed == null ? avg : state.avgSpeed * 0.85 + avg * 0.15;
+        state.history.push(dets.length); if (state.history.length > 200) state.history.shift();
+        renderAll();
+      } catch (e) {
+        console.error(e);
+        showMsg(e.name === "SecurityError" ? "This camera does not allow browsers to read its pixels (no CORS header)." : "Inference error: " + e.message, true);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    await new Promise((r) => setTimeout(r, worked ? 0 : 20));
+  }
+}
+
+/* ================= Rendering ================= */
+let frames = 0, fpsT0 = performance.now();
+function render() {
+  requestAnimationFrame(render);
+  const s = state.source;
+  if (!ready()) return;
+  if (s.waiting) { s.waiting = false; hideMsg(); $("live").classList.remove("hidden"); }
+  const [w, h] = size();
+  if (view.width !== w || view.height !== h) { view.width = w; view.height = h; }
+  vctx.drawImage(s.el, 0, 0, w, h);
+
+  if ($("optHeat").checked && state.heat) {
+    vctx.save(); vctx.globalAlpha = +$("heatOp").value; vctx.filter = `blur(${Math.round(w / 90)}px)`;
+    vctx.drawImage(heatCanvas, 0, 0, w, h); vctx.restore();
+  }
+
+  // Counting line
+  const ly = state.lineY * h, lw = Math.max(2, w / 400), font = Math.max(12, Math.round(w / 60));
+  const flash = performance.now() < flashUntil;
+  vctx.strokeStyle = flash ? "#ffffff" : "#ffd23f"; vctx.lineWidth = lw * (flash ? 3 : 2); vctx.setLineDash([16, 10]);
+  vctx.beginPath(); vctx.moveTo(0, ly); vctx.lineTo(w, ly); vctx.stroke(); vctx.setLineDash([]);
+  vctx.font = `700 ${font}px "Segoe UI", system-ui, sans-serif`; vctx.textBaseline = "top";
+  const tag = `COUNTING LINE   ↓ ${sum(tracker.down)}   ↑ ${sum(tracker.up)}`, tw = vctx.measureText(tag).width + 16;
+  vctx.fillStyle = "rgba(255,210,63,.92)"; vctx.fillRect(8, ly - font - 14, tw, font + 10);
+  vctx.fillStyle = "#1b1400"; vctx.fillText(tag, 16, ly - font - 9);
+
+  const showBoxes = $("optBoxes").checked, trails = $("optTrails").checked;
+  vctx.font = `600 ${Math.round(font * 0.85)}px "Segoe UI", system-ui, sans-serif`;
+  for (const d of state.dets) {
+    const tr = d.track, color = VEHICLES[tr ? tr.cls : d.cls][1];
+    const fast = tr && tr.speed > state.limit;
+    if (trails && tr && tr.path.length > 1) {
+      vctx.strokeStyle = color; vctx.globalAlpha = 0.75; vctx.lineWidth = lw;
+      vctx.beginPath(); tr.path.forEach(([x, y], i) => (i ? vctx.lineTo(x, y) : vctx.moveTo(x, y))); vctx.stroke(); vctx.globalAlpha = 1;
+    }
+    if (!showBoxes) continue;
+    vctx.strokeStyle = fast ? "#ff3b5c" : color; vctx.lineWidth = fast ? lw * 2 : lw;
+    vctx.setLineDash(tr && tr.hits >= 3 ? [] : [6, 4]);
+    vctx.strokeRect(d.x1, d.y1, d.x2 - d.x1, d.y2 - d.y1); vctx.setLineDash([]);
+    const sp = tr && tr.speed != null && tr.hits >= 3 ? ` ${Math.round(tr.speed)} km/h` : "";
+    const label = `#${tr ? tr.id : "?"} ${VEHICLES[tr ? tr.cls : d.cls][0]}${sp}`;
+    const th = Math.round(font * 0.85) + 6, lwid = vctx.measureText(label).width + 10, y = d.y1 - th < 0 ? d.y1 : d.y1 - th;
+    vctx.fillStyle = fast ? "#ff3b5c" : color; vctx.fillRect(d.x1, y, lwid, th);
+    vctx.fillStyle = fast ? "#fff" : "#06101a"; vctx.fillText(label, d.x1 + 5, y + 3);
+  }
+
+  frames++;
+  const now = performance.now();
+  if (now - fpsT0 > 500) {
+    $("lFps").textContent = ((frames * 1000) / (now - fpsT0)).toFixed(0); frames = 0; fpsT0 = now;
+    $("pillInfer").textContent = state.analysing ? `${state.inferMs.toFixed(0)} ms / frame` : "paused";
+  }
+}
+const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+
+/* ================= Dashboard ================= */
+let lastUi = 0;
+function renderAll(force) {
+  const now = performance.now();
+  if (!force && now - lastUi < 250) return; lastUi = now;
+  const down = sum(tracker.down), up = sum(tracker.up);
+  $("kTotal").textContent = down + up; $("kIn").textContent = down; $("kOut").textContent = up;
+  $("kSpeed").textContent = state.avgSpeed == null ? "–" : state.avgSpeed.toFixed(1);
+  $("kFast").textContent = tracker.speeding; $("kFastHint").textContent = `over ${state.limit} km/h`;
+  $("lActive").textContent = state.dets.length;
+
+  const nowBy = {};
+  state.dets.forEach((d) => { const c = d.track ? d.track.cls : d.cls; nowBy[c] = (nowBy[c] || 0) + 1; });
+  const classes = Object.keys(VEHICLES).map(Number).filter((c) => nowBy[c] || tracker.down[c] || tracker.up[c]);
+  $("typeBody").innerHTML = classes.length ? classes.map((c) => `<tr><td><span class="swatch" style="background:${VEHICLES[c][1]}"></span>${VEHICLES[c][0]}</td>` +
+    `<td>${nowBy[c] || 0}</td><td>${tracker.down[c] || 0}</td><td>${tracker.up[c] || 0}</td><td>${tracker.speedN[c] ? (tracker.speedSum[c] / tracker.speedN[c]).toFixed(0) : "–"}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="muted">No vehicles yet</td></tr>`;
+  drawChart();
+}
+function renderLog() {
+  const L = tracker.log;
+  $("logCount").textContent = L.length ? `· ${L.length}` : "";
+  $("logBody").innerHTML = L.length ? L.slice(0, 60).map((e) => `<tr><td>${e.time.toLocaleTimeString()}</td><td>#${e.id}</td><td>${e.type}</td>` +
+    `<td>${e.dir === "down" ? "↓ in" : "↑ out"}</td><td class="${e.fast ? "fast" : ""}">${e.kmh == null ? "–" : e.kmh + " km/h"}${e.fast ? " ⚠" : ""}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="muted">Every vehicle that crosses the line appears here.</td></tr>`;
+}
+function drawChart() {
+  const c = $("chart"), ctx = c.getContext("2d"), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = 140;
+  if (!W) return;
+  if (c.width !== W * dpr) { c.width = W * dpr; c.height = H * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const data = state.history, max = Math.max(5, ...data);
+  ctx.strokeStyle = "#263247"; ctx.fillStyle = "#8a97ab"; ctx.font = "11px Segoe UI"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 2; i++) { const y = 8 + ((H - 28) * i) / 2; ctx.beginPath(); ctx.moveTo(26, y); ctx.lineTo(W, y); ctx.stroke(); ctx.fillText(String(Math.round(max * (1 - i / 2))), 2, y + 4); }
+  const perMin = crossTimes.filter((t) => performance.now() - t < 60000).length;
+  ctx.fillText(`on screen (last ${data.length} frames) · ${perMin} crossings in the last minute`, 28, H - 4);
+  if (data.length < 2) return;
+  const x = (i) => 26 + ((W - 28) * i) / 199, y = (v) => 8 + (H - 28) * (1 - v / max);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "rgba(74,163,255,.45)"); g.addColorStop(1, "rgba(74,163,255,0)");
+  ctx.beginPath(); ctx.moveTo(x(0), y(data[0])); data.forEach((v, i) => ctx.lineTo(x(i), y(v)));
+  ctx.lineTo(x(data.length - 1), H - 20); ctx.lineTo(x(0), H - 20); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); data.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)))); ctx.strokeStyle = "#4aa3ff"; ctx.lineWidth = 2; ctx.stroke();
+}
+
+/* ================= Helpers ================= */
+function setPill(id, text, cls) { const el = $(id); el.textContent = text; el.className = "pill" + (cls ? " " + cls : ""); }
+function showMsg(t, err) { const m = $("stageMsg"); m.textContent = t; m.className = "stage-msg" + (err ? " err" : ""); }
+function hideMsg() { $("stageMsg").className = "stage-msg hidden"; }
+function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+const stamp = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+
+/* ================= Wiring ================= */
+function slider(id, fmt, apply) {
+  const el = $(id), out = $(id + "Val");
+  const upd = () => { out.textContent = fmt(+el.value); apply && apply(+el.value); };
+  el.addEventListener("input", upd); upd();
+}
+slider("lineY", (v) => Math.round(v * 100) + "%", (v) => { state.lineY = v; tracker.tracks.forEach((t) => (t.side = null)); });
+slider("mpp", (v) => v.toFixed(3) + " m/px", (v) => (state.mpp = v));
+slider("far", (v) => v.toFixed(2) + "×", (v) => (state.far = v));
+slider("limit", (v) => v + " km/h", (v) => { state.limit = v; renderAll(true); });
+slider("heatOp", (v) => Math.round(v * 100) + "%");
+slider("heatMem", () => { const s = heatHalfLife(); return s < 60 ? `${Math.round(s)} s` : `${(s / 60).toFixed(1)} min`; });
+slider("conf", (v) => v.toFixed(2), (v) => (state.conf = v));
+
+function renderChips() {
+  $("chips").innerHTML = Object.entries(VEHICLES).map(([c, [n, col]]) =>
+    `<button class="chip ${state.enabled.has(+c) ? "on" : ""}" data-c="${c}" style="${state.enabled.has(+c) ? "background:" + col : ""}">${n}</button>`).join("");
+}
+renderChips();
+$("chips").onclick = (e) => { const b = e.target.closest(".chip"); if (!b) return; const c = +b.dataset.c; state.enabled.has(c) ? state.enabled.delete(c) : state.enabled.add(c); renderChips(); };
+
+PRESETS.forEach((p) => {
+  const b = document.createElement("button"); b.dataset.url = p.url;
+  b.innerHTML = `<span>📍 ${p.name}</span><span class="muted">use</span>`;
+  b.onclick = () => { $("cctvUrl").value = p.url; connect(p.url); };
+  $("presets").appendChild(b);
+});
+$("btnConnect").onclick = () => connect($("cctvUrl").value.trim());
+$("pickFile").onclick = () => $("fileInput").click();
+$("fileInput").onchange = (e) => e.target.files[0] && playFile(e.target.files[0]);
+$("btnDetect").onclick = () => {
+  state.analysing = !state.analysing;
+  $("btnDetect").textContent = state.analysing ? "● Analysing" : "○ Paused"; $("btnDetect").classList.toggle("on", state.analysing);
+  if (!state.analysing) state.dets = [];
+};
+$("btnReset").onclick = () => { tracker.reset(); state.heat = null; state.history = []; state.avgSpeed = null; crossTimes.length = 0; renderLog(); renderAll(true); };
+$("btnSnap").onclick = () => view.width && view.toBlob((b) => download(b, `traffic-snapshot-${stamp()}.png`), "image/png");
+$("btnCsv").onclick = () => {
+  const rows = [["time", "track_id", "type", "direction", "speed_kmh", "over_limit"],
+    ...tracker.log.slice().reverse().map((e) => [e.time.toISOString(), e.id, e.type, e.dir === "down" ? "inflow" : "outflow", e.kmh ?? "", e.fast])];
+  download(new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" }), `traffic-crossings-${stamp()}.csv`);
+};
+$("btnFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : $("stage").requestFullscreen());
+window.addEventListener("resize", drawChart);
+
+requestAnimationFrame(render);
+inferLoop();
+loadModel().then(() => connect($("cctvUrl").value.trim()));
+</script>
+</body>
+</html>

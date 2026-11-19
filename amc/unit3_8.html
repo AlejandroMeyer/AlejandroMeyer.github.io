@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit3_8 · Fast Neural Style Gallery</title>
+<style>
+:root { --bg: #0b0f17; --panel: #131a26; --panel-2: #1a2333; --border: #263247; --text: #e6ebf3; --muted: #8a97ab;
+  --accent: #19d3a2; --accent-2: #4aa3ff; --violet: #8b5cf6; --danger: #ff5c7a; --radius: 12px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 22px; border-bottom: 1px solid var(--border); background: #0f1622; }
+header h1 { margin: 0; font-size: 19px; }
+header h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+header a { color: var(--accent-2); text-decoration: none; }
+.layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 22px; padding: 18px 22px; max-width: 1500px; margin: 0 auto; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } }
+
+/* Left column: numbered steps */
+.step { margin-bottom: 20px; }
+.step h2 { display: flex; align-items: center; gap: 8px; font-size: 14.5px; margin: 0 0 8px; }
+.step h2 span { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; font-size: 12px; background: rgba(139, 92, 246, .2); color: #c4b1ff; }
+.photo { position: relative; border: 2px dashed var(--border); border-radius: var(--radius); overflow: hidden; aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; cursor: pointer; background: #05080d; color: var(--muted); text-align: center; padding: 10px; }
+.photo.drag { border-color: var(--accent); }
+.photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.photo .chg { position: absolute; right: 8px; bottom: 8px; background: rgba(10, 14, 22, .8); border-radius: 7px; padding: 2px 8px; font-size: 12px; color: var(--text); }
+.link { background: none; border: 0; padding: 0; color: #a98bff; text-decoration: underline; cursor: pointer; font-size: 13px; margin-top: 6px; }
+select { width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; }
+.note { color: var(--muted); font-size: 12px; margin-top: 5px; }
+.btn { width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 10px; cursor: pointer; margin-top: 8px; }
+.btn:hover:not(:disabled) { border-color: var(--violet); }
+.btn.primary { background: var(--violet); border-color: var(--violet); color: #fff; font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; }
+.progress { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+.progress div { height: 100%; width: 0; background: linear-gradient(90deg, var(--violet), var(--accent-2)); transition: width .25s; }
+.status { color: var(--muted); font-size: 12.5px; margin-top: 6px; min-height: 18px; }
+.about { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; color: var(--muted); font-size: 12.5px; }
+.about b { color: var(--text); }
+
+/* Right column */
+.sec h2 { font-size: 15px; margin: 0 0 4px; }
+.sec h2 small { color: var(--muted); font-weight: 400; font-size: 12.5px; margin-left: 6px; }
+.group { font-size: 11.5px; letter-spacing: .6px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; }
+.styles { display: flex; flex-wrap: wrap; gap: 10px; }
+.style { position: relative; width: 104px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 5px; cursor: pointer; text-align: center; font-size: 12.5px; }
+.style img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; display: block; }
+.style span { display: block; padding: 4px 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.style.sel { border-color: var(--violet); box-shadow: 0 0 0 2px var(--violet); }
+.style .dot { position: absolute; top: 8px; right: 8px; width: 13px; height: 13px; border-radius: 50%; background: var(--accent); border: 2px solid #0b0f17; }
+.style .spin { position: absolute; top: 7px; right: 7px; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .3); border-top-color: #fff; border-radius: 50%; animation: s 0.8s linear infinite; }
+@keyframes s { to { transform: rotate(360deg); } }
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin-top: 10px; }
+.res { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.res canvas, .res img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; display: block; cursor: zoom-in; background: #05080d; }
+.res .meta { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; }
+.res .meta b { display: block; font-size: 13.5px; }
+.res .meta small { color: var(--muted); font-size: 12px; }
+.res .meta button { background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 4px 9px; font-size: 12.5px; cursor: pointer; }
+.empty { color: var(--muted); font-size: 13px; padding: 20px; border: 1px dashed var(--border); border-radius: 12px; text-align: center; }
+.lightbox { position: fixed; inset: 0; background: rgba(0, 0, 0, .85); display: flex; align-items: center; justify-content: center; z-index: 10; cursor: zoom-out; padding: 20px; }
+.lightbox canvas { max-width: 100%; max-height: 100%; }
+footer { color: var(--muted); font-size: 12px; padding: 0 22px 22px; max-width: 1500px; margin: 0 auto; }
+footer a { color: var(--muted); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<header>
+  <h1>unit3_8 · Fast Neural Style Gallery <small>11 feed-forward style networks · ONNX Runtime Web</small></h1>
+  <a href="../unit.html?unit=3">← Back to Unit 3</a>
+</header>
+
+<main class="layout">
+  <aside>
+    <div class="step">
+      <h2><span>1</span> Photo</h2>
+      <div class="photo" id="photo" title="Click, drop or paste a photo">
+        <div id="photoHint">Drop a photo here, paste it (Ctrl+V) or click to browse</div>
+        <img id="photoImg" class="hidden" alt="Your photo">
+        <div class="chg hidden" id="photoChg">Change photo</div>
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <button class="link" id="btnSample">or try a sample photo</button>
+    </div>
+    <div class="step">
+      <h2><span>2</span> Size</h2>
+      <select id="size">
+        <option value="256" selected>256 px · fast (default)</option>
+        <option value="384">384 px</option>
+        <option value="512">512 px</option>
+        <option value="768">768 px · slow</option>
+        <option value="1024">1024 px · slowest</option>
+      </select>
+      <div class="note" id="sizeNote">Choose a photo first.</div>
+    </div>
+    <div class="step">
+      <h2><span>3</span> Convert</h2>
+      <button class="btn" id="btnOne" disabled>Convert to …</button>
+      <button class="btn primary" id="btnAll" disabled>Convert all styles</button>
+      <div class="progress"><div id="bar"></div></div>
+      <div class="status" id="status">Loading ONNX Runtime…</div>
+    </div>
+    <div class="about">
+      <b>How is this different from unit3_3?</b><br>
+      Here every style is its own small network, trained once on one painting (Johnson et al., 2016). Converting is a single fast pass, but you cannot add new styles.
+      unit3_3 also has an <i>arbitrary</i> model that copies the style of any painting you upload.
+    </div>
+  </aside>
+
+  <section>
+    <div class="sec">
+      <h2>Styles <small>Click a style to pick it. A green dot means the model is loaded and cached.</small></h2>
+      <div class="group">ONNX Model Zoo</div>
+      <div class="styles" id="zoo"></div>
+      <div class="group">Fast-neural-style (converted from .t7)</div>
+      <div class="styles" id="t7"></div>
+    </div>
+    <div class="sec" style="margin-top:22px">
+      <h2>Results <small id="resInfo"></small></h2>
+      <div class="results" id="results"><div class="empty" style="grid-column:1/-1">Your stylised photos will appear here.</div></div>
+    </div>
+  </section>
+</main>
+<footer>
+  Models: fast neural style transfer (Johnson, Alahi &amp; Fei-Fei, ECCV 2016). Candy, Mosaic, Rain Princess, Udnie and Pointillism from the ONNX Model Zoo;
+  Starry Night, La Muse, The Scream, The Wave, Feathers and Composition VII from the original Torch7 release (jcjohnson/fast-neural-style), converted to ONNX.
+  Sample photo: “Scheideggseeli” by Dominicus Johannes Bergsma, CC BY-SA 4.0, via Wikimedia Commons.
+</footer>
+<div class="lightbox hidden" id="lightbox"></div>
+
+<script>
+"use strict";
+const STYLES = [
+  { id: "candy", name: "Candy", group: "zoo", file: "assets/models/style/candy-9.onnx" },
+  { id: "mosaic", name: "Mosaic", group: "zoo", file: "assets/models/style/mosaic-9.onnx" },
+  { id: "rain-princess", name: "Rain Princess", group: "zoo", file: "assets/models/style/rain-princess-9.onnx" },
+  { id: "udnie", name: "Udnie", group: "zoo", file: "assets/models/style/udnie-9.onnx" },
+  { id: "pointilism", name: "Pointillism", group: "zoo", file: "assets/models/style/pointilism-9.onnx" },
+  { id: "starry-night", name: "Starry Night", group: "t7", file: "assets/models/style-t7/starry-night.onnx" },
+  { id: "la-muse", name: "La Muse", group: "t7", file: "assets/models/style-t7/la-muse.onnx" },
+  { id: "the-scream", name: "The Scream", group: "t7", file: "assets/models/style-t7/the-scream.onnx" },
+  { id: "the-wave", name: "The Wave", group: "t7", file: "assets/models/style-t7/the-wave.onnx" },
+  { id: "feathers", name: "Feathers", group: "t7", file: "assets/models/style-t7/feathers.onnx" },
+  { id: "composition-vii", name: "Composition VII", group: "t7", file: "assets/models/style-t7/composition-vii.onnx" },
+];
+const $ = (id) => document.getElementById(id);
+const state = { photo: null, photoName: "photo", selected: STYLES[0], sessions: {}, backend: null, busy: false, results: new Map() };
+
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+
+/* ================= Style tiles ================= */
+function renderTiles() {
+  for (const g of ["zoo", "t7"]) $(g).innerHTML = STYLES.filter((s) => s.group === g).map((s) =>
+    `<div class="style ${s === state.selected ? "sel" : ""}" data-id="${s.id}" title="${s.name}">
+       <img src="assets/styles/thumbs/${s.id}.jpg" alt=""><span>${s.name}</span>
+       ${s.loading ? '<i class="spin"></i>' : state.sessions[s.id] ? '<i class="dot"></i>' : ""}
+     </div>`).join("");
+  $("btnOne").textContent = `Convert to ${state.selected.name}`;
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest(".style"); if (!t) return;
+  state.selected = STYLES.find((s) => s.id === t.dataset.id); renderTiles();
+});
+
+/* ================= Models ================= */
+async function session(style) {
+  if (state.sessions[style.id]) return state.sessions[style.id];
+  style.loading = true; renderTiles();
+  const order = navigator.gpu && state.backend !== "wasm" ? ["webgpu", "wasm"] : ["wasm"];
+  let err;
+  try {
+    for (const ep of order) {
+      try {
+        const s = await ort.InferenceSession.create(style.file, { executionProviders: [ep] });
+        // Smoke test: some ops only fail on WebGPU at run time
+        await s.run({ [s.inputNames[0]]: new ort.Tensor("float32", new Float32Array(3 * 64 * 64), [1, 3, 64, 64]) });
+        state.sessions[style.id] = s; s.ep = ep; if (!state.backend) state.backend = ep;
+        return s;
+      } catch (e) { err = e; console.warn(style.id, ep, e); }
+    }
+    throw err;
+  } finally { style.loading = false; renderTiles(); }
+}
+
+/* ================= Photo ================= */
+function setPhoto(src, name) {
+  const img = new Image();
+  img.onload = () => {
+    state.photo = img; state.photoName = name;
+    $("photoImg").src = img.src; $("photoImg").classList.remove("hidden"); $("photoChg").classList.remove("hidden"); $("photoHint").classList.add("hidden");
+    state.results.clear(); renderResults(); updateSizeNote();
+    $("btnOne").disabled = $("btnAll").disabled = false;
+    setStatus("Pick a style and convert, or convert all styles at once.");
+  };
+  img.onerror = () => setStatus("That file could not be read as an image.");
+  img.src = typeof src === "string" ? src : URL.createObjectURL(src);
+}
+function procSize() {
+  const L = +$("size").value, w = state.photo.naturalWidth, h = state.photo.naturalHeight, s = Math.min(1, L / Math.max(w, h));
+  const r = (v) => Math.max(4, Math.round((v * s) / 4) * 4);
+  return [r(w), r(h)];
+}
+function updateSizeNote() {
+  if (!state.photo) return;
+  const [w, h] = procSize();
+  $("sizeNote").textContent = `Processing size: ${w} × ${h} px (original ${state.photo.naturalWidth} × ${state.photo.naturalHeight})`;
+}
+
+/* ================= Stylise ================= */
+async function stylize(style) {
+  const s = await session(style), [w, h] = procSize();
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const cx = c.getContext("2d", { willReadFrequently: true }); cx.drawImage(state.photo, 0, 0, w, h);
+  const px = cx.getImageData(0, 0, w, h).data, N = w * h, input = new Float32Array(3 * N);
+  for (let i = 0, j = 0; i < N; i++, j += 4) { input[i] = px[j]; input[N + i] = px[j + 1]; input[2 * N + i] = px[j + 2]; }
+  const t0 = performance.now();
+  const out = (await s.run({ [s.inputNames[0]]: new ort.Tensor("float32", input, [1, 3, h, w]) }))[s.outputNames[0]];
+  const ms = performance.now() - t0, [oh, ow] = [out.dims[2], out.dims[3]], O = oh * ow, d = out.data;
+  const r = document.createElement("canvas"); r.width = ow; r.height = oh;
+  const rc = r.getContext("2d"), img = rc.createImageData(ow, oh), p = img.data;   // Uint8ClampedArray clamps to 0..255
+  for (let i = 0, j = 0; i < O; i++, j += 4) { p[j] = d[i]; p[j + 1] = d[O + i]; p[j + 2] = d[2 * O + i]; p[j + 3] = 255; }
+  rc.putImageData(img, 0, 0);
+  state.results.set(style.id, { style, canvas: r, ms, ep: s.ep });
+  renderResults();
+}
+async function run(list) {
+  if (state.busy || !state.photo) return;
+  state.busy = true; $("btnOne").disabled = $("btnAll").disabled = $("size").disabled = true;
+  let done = 0; bar(0);
+  try {
+    for (const st of list) {
+      setStatus(`Converting to ${st.name}… (${done + 1}/${list.length})`);
+      await stylize(st); done++; bar(done / list.length);
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    const total = [...state.results.values()].filter((r) => list.includes(r.style)).reduce((a, r) => a + r.ms, 0);
+    setStatus(`Done: ${done} style${done > 1 ? "s" : ""} in ${(total / 1000).toFixed(1)} s on ${(state.backend || "").toUpperCase()}.`);
+  } catch (e) { console.error(e); setStatus("Error: " + e.message); }
+  state.busy = false; $("btnOne").disabled = $("btnAll").disabled = $("size").disabled = false;
+}
+
+/* ================= Results ================= */
+function renderResults() {
+  const el = $("results");
+  if (!state.photo) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">Your stylised photos will appear here.</div>'; return; }
+  const [w, h] = procSize();
+  $("resInfo").textContent = state.results.size ? `${state.results.size} of ${STYLES.length} styles` : "";
+  el.innerHTML = "";
+  el.appendChild(card(state.photo, "Original", `${w} × ${h}`, () => download(toCanvas(state.photo, w, h), "original")));
+  for (const st of STYLES) {
+    const r = state.results.get(st.id); if (!r) continue;
+    el.appendChild(card(r.canvas, st.name, r.ms < 1000 ? `${Math.round(r.ms)} ms` : `${(r.ms / 1000).toFixed(1)} s`, () => download(r.canvas, st.id)));
+  }
+  if (!state.results.size) el.insertAdjacentHTML("beforeend", '<div class="empty">Pick a style and press <b>Convert</b>, or <b>Convert all styles</b>.</div>');
+}
+function card(src, name, sub, onDl) {
+  const d = document.createElement("div"); d.className = "res";
+  const pic = src instanceof HTMLCanvasElement ? src : Object.assign(new Image(), { src: src.src });
+  pic.onclick = () => openLightbox(src);
+  d.appendChild(pic);
+  d.insertAdjacentHTML("beforeend", `<div class="meta"><div><b>${name}</b><small>${sub}</small></div><button>⬇ Download</button></div>`);
+  d.querySelector("button").onclick = onDl;
+  return d;
+}
+function toCanvas(img, w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h); return c; }
+function download(canvas, id) {
+  canvas.toBlob((b) => { const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${state.photoName}_${id}.png`; a.click(); }, "image/png");
+}
+function openLightbox(src) {
+  const lb = $("lightbox"); lb.innerHTML = "";
+  const c = src instanceof HTMLCanvasElement ? toCanvas(src, src.width, src.height) : toCanvas(src, src.naturalWidth, src.naturalHeight);
+  lb.appendChild(c); lb.classList.remove("hidden");
+}
+$("lightbox").onclick = () => $("lightbox").classList.add("hidden");
+
+/* ================= Wiring ================= */
+const bar = (f) => ($("bar").style.width = `${Math.round(f * 100)}%`);
+const setStatus = (t) => ($("status").textContent = t);
+$("photo").onclick = () => $("file").click();
+$("file").onchange = (e) => { const f = e.target.files[0]; if (f) setPhoto(f, f.name.replace(/\.[^.]+$/, "")); e.target.value = ""; };
+$("photo").addEventListener("dragover", (e) => { e.preventDefault(); $("photo").classList.add("drag"); });
+$("photo").addEventListener("dragleave", () => $("photo").classList.remove("drag"));
+$("photo").addEventListener("drop", (e) => { e.preventDefault(); $("photo").classList.remove("drag"); const f = [...e.dataTransfer.files].find((x) => x.type.startsWith("image/")); if (f) setPhoto(f, f.name.replace(/\.[^.]+$/, "")); });
+addEventListener("paste", (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith("image/")); if (f) setPhoto(f, "pasted"); });
+$("btnSample").onclick = () => setPhoto("assets/styles/sample.jpg", "sample");
+$("size").onchange = () => { state.results.clear(); updateSizeNote(); renderResults(); };
+$("btnOne").onclick = () => run([state.selected]);
+$("btnAll").onclick = () => run(STYLES);
+renderTiles();
+setStatus("Choose a photo to begin. Models download the first time you use them.");
+</script>
+</body>
+</html>

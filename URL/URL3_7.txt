@@ -1,0 +1,2 @@
+YOLO26 Multi-Task Studio
+https://alejandromeyer.github.io/amc/unit3_7.html
