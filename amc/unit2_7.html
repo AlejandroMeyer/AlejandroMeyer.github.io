@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit2_7 · Alejandro Meyer · Hand-Controlled Particles</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05080f; color: #e6ebf3; font: 15px/1.45 "Segoe UI", system-ui, sans-serif; }
+  #particles { position: fixed; inset: 0; width: 100%; height: 100%; }
+  h1 { position: fixed; top: 14px; left: 0; right: 0; margin: 0; text-align: center; font-size: clamp(28px, 4.2vw, 54px); font-weight: 800; letter-spacing: 2px;
+    background: linear-gradient(90deg, #00ffa8, #00ccff); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 14px rgba(0, 230, 200, .55)); pointer-events: none; }
+  .back { position: fixed; top: 14px; left: 16px; color: #4aa3ff; text-decoration: none; font-size: 14px; background: rgba(13, 20, 34, .8); padding: 5px 12px; border-radius: 999px; border: 1px solid #263247; z-index: 3; }
+  .panel { position: fixed; left: 20px; bottom: 20px; width: min(440px, calc(100vw - 40px)); background: rgba(13, 20, 34, .82); border: 1px solid #2c3a52; border-radius: 16px; padding: 16px 20px; backdrop-filter: blur(6px); z-index: 2; }
+  .clock { font-size: 32px; font-weight: 700; color: #00ffa8; font-variant-numeric: tabular-nums; }
+  .date { color: #a0beff; margin-bottom: 8px; }
+  .row { margin-top: 8px; font-size: 14px; }
+  .row b { color: #ffd166; }
+  .bar { height: 7px; background: #2a3242; border-radius: 99px; overflow: hidden; margin-top: 5px; }
+  .bar div { height: 100%; width: 0; background: linear-gradient(90deg, #00ffa8, #6a8dff); transition: width .15s; }
+  .hint { color: #8a97ab; font-size: 12px; margin-top: 10px; }
+  .cam { position: fixed; right: 20px; bottom: 20px; width: min(420px, 42vw); aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 2px solid #c8ffdc;
+    box-shadow: 0 0 22px rgba(0, 255, 168, .55); background: #000; z-index: 2; }
+  .cam canvas { width: 100%; height: 100%; display: block; }
+  .start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 5; background: rgba(5, 8, 15, .6); text-align: center; padding: 16px; }
+  .start button, .start label { background: linear-gradient(90deg, #00ffa8, #00ccff); color: #04121b; border: 0; border-radius: 12px; padding: 12px 22px; font: 600 16px "Segoe UI", sans-serif; cursor: pointer; }
+  .start label { background: #1a2333; color: #e6ebf3; border: 1px solid #263247; font-weight: 500; font-size: 14px; padding: 9px 16px; }
+  .start input { display: none; }
+  .start p { color: #a7b4c6; max-width: 460px; margin: 0; }
+  .start .err { color: #ff8fa3; }
+  @media (max-width: 760px) { .cam { top: 80px; bottom: auto; width: 46vw; } .panel { padding: 12px 14px; } .clock { font-size: 24px; } }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+<h1>Alejandro Meyer</h1>
+<a class="back" href="../unit.html?unit=2">← Back to Unit 2</a>
+
+<div class="panel">
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="date" id="date"></div>
+  <div class="row">Right Hand: <b id="state" style="color:#8a97ab">Not Detected</b></div>
+  <div class="row">Openness: <b id="openPct">--</b><div class="bar"><div id="openBar"></div></div></div>
+  <div class="row">Distance to Screen: <b id="dist">--</b><div class="bar"><div id="distBar"></div></div></div>
+  <div class="row">Shape: <b id="shape">Heart</b> &nbsp; Color: <b id="color" style="color:#ff2d55">Red</b></div>
+  <div class="hint">Fist → Open switches shape &amp; color · moving closer shrinks the particle range · <b>N</b> next shape</div>
+</div>
+<div class="cam"><canvas id="cam" width="640" height="480"></canvas></div>
+
+<div class="start" id="start">
+  <p id="startText">Loading hand &amp; pose models…</p>
+  <button id="btnCam" disabled>🎥 Start camera</button>
+  <label>📁 or use a video file<input type="file" id="file" accept="video/*"></label>
+</div>
+<video id="video" playsinline muted></video>
+
+<script type="module">
+import { FilesetResolver, HandLandmarker, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const $ = (id) => document.getElementById(id);
+const video = $("video"); video.style.display = "none";
+const pc = $("particles"), pctx = pc.getContext("2d");
+const cam = $("cam"), cctx = cam.getContext("2d");
+
+/* ---------- Clock ---------- */
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+setInterval(() => {
+  const n = new Date();
+  $("clock").textContent = n.toLocaleTimeString("en-GB", { hour12: false });
+  $("date").textContent = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")} ${DAYS[n.getDay()]}`;
+}, 500);
+
+/* ---------- Shapes (unit coordinates) ---------- */
+const SHAPES = [
+  ["Heart", (t) => [16 * Math.sin(t) ** 3 / 17, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 17]],
+  ["Star", (t) => {
+    const seg = (t / (2 * Math.PI)) * 10, i = Math.floor(seg), f = seg - i;
+    const r1 = i % 2 === 0 ? 1 : 0.42, r2 = i % 2 === 0 ? 0.42 : 1;
+    const a1 = (i / 10) * 2 * Math.PI - Math.PI / 2, a2 = ((i + 1) / 10) * 2 * Math.PI - Math.PI / 2;
+    return [r1 * Math.cos(a1) + (r2 * Math.cos(a2) - r1 * Math.cos(a1)) * f, r1 * Math.sin(a1) + (r2 * Math.sin(a2) - r1 * Math.sin(a1)) * f];
+  }],
+  ["Flower", (t) => { const r = Math.abs(Math.cos(2.5 * t)); return [r * Math.cos(t), r * Math.sin(t)]; }],
+  ["Butterfly", (t) => { const s = t * 6, r = Math.exp(Math.sin(s)) - 2 * Math.cos(4 * s) + Math.sin((2 * s - Math.PI) / 24) ** 5; return [r * Math.sin(s) / 4, -r * Math.cos(s) / 4 + 0.15]; }],
+  ["Spiral", (t) => { const r = t / (2 * Math.PI); return [r * Math.cos(t * 3), r * Math.sin(t * 3)]; }],
+];
+const PALETTES = [["Red", "#ff2d55", "#ff9500"], ["Teal", "#00ffa8", "#00ccff"], ["Blue", "#3a7bff", "#9d6bff"],
+  ["Gold", "#ffd60a", "#ff7b00"], ["Magenta", "#ff2dcb", "#7a5cff"], ["White", "#ffffff", "#9adcff"]];
+
+/* ---------- Particles ---------- */
+const N = 4000;
+const P = Array.from({ length: N }, (_, i) => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, vx: 0, vy: 0,
+  t: (i / N) * 2 * Math.PI, jx: Math.random() - 0.5, jy: Math.random() - 0.5, size: 1.5 + Math.random() * 2.5, tw: Math.random() * 6.28 }));
+const ctl = { shape: 0, pal: 0, open: 0.5, rawOpen: 0.5, dist: 1, rawDist: 1, near: 0, wasClosed: false, seen: false };
+function resize() { pc.width = innerWidth * devicePixelRatio; pc.height = innerHeight * devicePixelRatio; }
+addEventListener("resize", resize); resize();
+
+function drawParticles() {
+  const W = innerWidth, H = innerHeight, dpr = devicePixelRatio;
+  ctl.open += (ctl.rawOpen - ctl.open) * 0.12;
+  ctl.dist += (ctl.rawDist - ctl.dist) * 0.08;
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  pctx.globalCompositeOperation = "source-over";
+  pctx.fillStyle = "#05080f"; pctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 + 20, baseR = Math.min(W, H) * 0.52 * ctl.dist;
+  const scale = baseR * (0.08 + 0.92 * ctl.open), scatter = Math.max(0, ctl.open - 0.55) * baseR * 6;
+  const fn = SHAPES[ctl.shape][1], [, ca, cb] = PALETTES[ctl.pal], time = performance.now() / 1000;
+  pctx.globalCompositeOperation = "lighter";
+  for (const p of P) {
+    const [ux, uy] = fn(p.t);
+    const tx = cx + ux * scale + p.jx * scatter, ty = cy + uy * scale + p.jy * scatter;
+    p.vx = (p.vx + (tx - p.x) * 0.045) * 0.86; p.vy = (p.vy + (ty - p.y) * 0.045) * 0.86;
+    p.x += p.vx; p.y += p.vy;
+    pctx.globalAlpha = (0.55 + 0.45 * Math.sin(time * 3 + p.tw)) * (0.35 + 0.65 * ctl.open);
+    pctx.fillStyle = p.t % (Math.PI / 2) < Math.PI / 4 ? ca : cb;
+    pctx.beginPath(); pctx.arc(p.x, p.y, p.size * (0.6 + 0.6 * ctl.open), 0, 6.283); pctx.fill();
+  }
+  pctx.globalAlpha = 1;
+}
+
+/* ---------- Hand control ---------- */
+const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function updateHand(lm) {
+  if (!lm) { $("state").textContent = "Not Detected"; $("state").style.color = "#8a97ab"; return; }
+  ctl.seen = true;
+  const palm = d2(lm[0], lm[9]) || 1e-6;
+  const ratio = [4, 8, 12, 16, 20].reduce((s, i) => s + d2(lm[0], lm[i]), 0) / 5 / palm;
+  ctl.rawOpen = Math.min(1, Math.max(0, (ratio - 1) / 0.85));
+  ctl.near = Math.min(1, Math.max(0, (palm - 0.05) / 0.22));
+  ctl.rawDist = 1.6 - ctl.near * 1.3;
+  const closed = ctl.rawOpen < 0.25, opened = ctl.rawOpen > 0.65;
+  if (closed) ctl.wasClosed = true;
+  if (ctl.wasClosed && opened) { ctl.wasClosed = false; nextShape(); }
+  $("state").textContent = closed ? "Fist" : opened ? "Open" : "Half Open";
+  $("state").style.color = closed ? "#ff5f7a" : "#06f7a1";
+  $("openPct").textContent = Math.round(ctl.rawOpen * 100) + "%"; $("openBar").style.width = ctl.rawOpen * 100 + "%";
+  $("dist").textContent = ctl.near > 0.66 ? "Near" : ctl.near > 0.33 ? "Mid" : "Far"; $("distBar").style.width = ctl.near * 100 + "%";
+}
+function nextShape() {
+  ctl.shape = (ctl.shape + 1) % SHAPES.length; ctl.pal = (ctl.pal + 1) % PALETTES.length;
+  $("shape").textContent = SHAPES[ctl.shape][0];
+  $("color").textContent = PALETTES[ctl.pal][0]; $("color").style.color = PALETTES[ctl.pal][1];
+}
+
+/* ---------- Neon skeletons on the camera view ---------- */
+const FINGER = ["#ffffff", "#ff5f7a", "#ffd166", "#06f7a1", "#4cc9f0", "#c77dff"];
+const fingerOf = (i) => (i === 0 ? 0 : Math.floor((i - 1) / 4) + 1);
+const poseColor = (i) => (i <= 10 ? "#ff8fd8" : [11, 12, 23, 24].includes(i) ? "#ffd166" : i <= 22 ? "#00e5ff" : "#b388ff");
+function glowLine(a, b, color, w) {
+  cctx.save(); cctx.lineCap = "round"; cctx.shadowColor = color; cctx.shadowBlur = 12; cctx.strokeStyle = color; cctx.lineWidth = w;
+  cctx.beginPath(); cctx.moveTo(a[0], a[1]); cctx.lineTo(b[0], b[1]); cctx.stroke();
+  cctx.shadowBlur = 0; cctx.strokeStyle = "rgba(255,255,255,.85)"; cctx.lineWidth = Math.max(1, w * 0.35);
+  cctx.beginPath(); cctx.moveTo(a[0], a[1]); cctx.lineTo(b[0], b[1]); cctx.stroke(); cctx.restore();
+}
+function glowDot(p, color, r) {
+  cctx.save(); cctx.shadowColor = color; cctx.shadowBlur = 14; cctx.fillStyle = color;
+  cctx.beginPath(); cctx.arc(p[0], p[1], r, 0, 7); cctx.fill();
+  cctx.shadowBlur = 0; cctx.fillStyle = "#fff"; cctx.beginPath(); cctx.arc(p[0], p[1], r * 0.45, 0, 7); cctx.fill(); cctx.restore();
+}
+
+/* ---------- Models & loop ---------- */
+let hands, pose, mirror = true, stream = null, lastTs = -1, started = false;
+async function load() {
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const mk = async (Cls, url, extra, preferGpu) => {
+    if (preferGpu) {
+      try { return await Cls.createFromOptions(vision, { baseOptions: { modelAssetPath: url, delegate: "GPU" }, runningMode: "VIDEO", ...extra }); } catch (e) { /* fall back to CPU */ }
+    }
+    return Cls.createFromOptions(vision, { baseOptions: { modelAssetPath: url, delegate: "CPU" }, runningMode: "VIDEO", ...extra });
+  };
+  [hands, pose] = await Promise.all([
+    // hands on CPU: in testing the GPU palm detector missed a second hand that CPU finds
+    mk(HandLandmarker, "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task", { numHands: 2 }, false),
+    mk(PoseLandmarker, "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", { numPoses: 1 }, true),
+  ]);
+  $("btnCam").disabled = false;
+  $("startText").textContent = "Show your right hand: open it, close it, move it closer.";
+}
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+    video.srcObject = stream; mirror = true; await video.play(); go();
+  } catch (e) { $("startText").innerHTML = `<span class="err">Camera not available: ${e.message}</span>`; }
+}
+function startFile(f) { video.srcObject = null; video.src = URL.createObjectURL(f); video.loop = true; mirror = false; video.play().then(go); }
+function go() { $("start").style.display = "none"; started = true; }
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (started && hands && video.readyState >= 2) {
+    const w = video.videoWidth, h = video.videoHeight;
+    if (cam.width !== w || cam.height !== h) { cam.width = w; cam.height = h; }
+    cctx.save(); if (mirror) { cctx.translate(w, 0); cctx.scale(-1, 1); } cctx.drawImage(video, 0, 0, w, h); cctx.restore();
+    const ts = Math.max(performance.now(), lastTs + 1); lastTs = ts;
+    const hr = hands.detectForVideo(video, ts), pr = pose.detectForVideo(video, ts);
+    const px = (p) => [(mirror ? 1 - p.x : p.x) * w, p.y * h];
+    for (const lm of pr.landmarks || []) {
+      for (const c of PoseLandmarker.POSE_CONNECTIONS) {
+        const a = lm[c.start], b = lm[c.end];
+        if ((a.visibility ?? 1) < 0.5 || (b.visibility ?? 1) < 0.5) continue;
+        const pa = px(a), pb = px(b), mid = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2];
+        glowLine(pa, mid, poseColor(c.start), 4); glowLine(mid, pb, poseColor(c.end), 4);
+      }
+      lm.forEach((p, i) => { if ((i === 0 || i > 10) && (p.visibility ?? 1) >= 0.5) glowDot(px(p), poseColor(i), i === 0 ? 6 : 4.5); });
+    }
+    const handed = hr.handedness || hr.handednesses || [];
+    let right = null;
+    (hr.landmarks || []).forEach((lm, i) => {
+      // input is the raw (un-mirrored) frame, where MediaPipe's "Left" label is the person's right hand
+      const isRight = (handed[i] && handed[i][0] && handed[i][0].categoryName) === "Left";
+      for (const c of HandLandmarker.HAND_CONNECTIONS) {
+        const f = Math.max(fingerOf(c.start), fingerOf(c.end));
+        glowLine(px(lm[c.start]), px(lm[c.end]), isRight ? FINGER[f] : "#7a8ba8", isRight ? 4 : 3);
+      }
+      lm.forEach((p, k) => glowDot(px(p), isRight ? FINGER[fingerOf(k)] : "#9fb0c8", [4, 8, 12, 16, 20].includes(k) ? 6 : 4));
+      if (isRight) {
+        right = lm;
+        const wp = px(lm[0]); cctx.font = "bold 18px Segoe UI, sans-serif"; cctx.fillStyle = "#00ff88"; cctx.fillText("Control Hand R", wp[0] - 60, wp[1] + 30);
+      }
+    });
+    if (!right && (hr.landmarks || []).length === 1) right = hr.landmarks[0];
+    updateHand(right);
+  }
+  drawParticles();
+}
+
+$("btnCam").onclick = startCamera;
+$("file").onchange = (e) => e.target.files[0] && startFile(e.target.files[0]);
+addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "n") nextShape(); });
+requestAnimationFrame(frame);
+load().catch((e) => { $("startText").innerHTML = `<span class="err">Could not load the models: ${e.message}</span>`; });
+</script>
+</body>
+</html>

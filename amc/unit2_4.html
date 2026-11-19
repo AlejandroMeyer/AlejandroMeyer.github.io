@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit2_4 · Two-Hand Gesture Recognizer</title>
+<style>
+  :root { --bg: #0b0f17; --panel: #131a26; --panel2: #1a2333; --border: #263247; --text: #e6ebf3; --muted: #8a97ab; --accent: #19d3a2; --accent2: #4aa3ff; --warn: #ffd166; --danger: #ff5c7a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--border); background: #0f1622; }
+  header h1 { margin: 0; font-size: 19px; } header h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  header a { color: var(--accent2); text-decoration: none; font-size: 14px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: #05080d; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; }
+  canvas { max-width: 100%; max-height: 100%; display: block; }
+  .msg { position: absolute; inset: auto 16px 16px 16px; text-align: center; background: rgba(10, 14, 22, .85); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .msg.err { border-color: var(--danger); color: #ffd0d9; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+  button, .filebtn { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  button:hover, .filebtn:hover { border-color: var(--accent2); }
+  button.primary { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #04121b; border: 0; font-weight: 600; }
+  .filebtn input { display: none; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: .5px; }
+  .big { font-size: 26px; font-weight: 700; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  label.small { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>unit2_4 · Two-Hand Gesture Recognizer <small>MediaPipe Gesture Recognizer · color-coded landmarks</small></h1>
+  <a href="../unit.html?unit=2">← Back to Unit 2</a>
+</header>
+<main>
+  <section>
+    <div class="stage"><canvas id="out" width="1280" height="720"></canvas><div class="msg" id="msg">Loading the gesture model…</div></div>
+    <div class="controls">
+      <button class="primary" id="btnCam" disabled>🎥 Start camera</button>
+      <label class="filebtn">📁 Use a video file<input type="file" id="file" accept="video/*"></label>
+      <label class="small">Min. confidence <input type="range" id="minScore" min="0.2" max="0.9" step="0.05" value="0.5"> <b id="minVal">0.50</b></label>
+    </div>
+  </section>
+  <aside>
+    <div class="card"><h3 style="color:#4aa3ff">LEFT HAND</h3><div class="big" id="gLeft">–</div><div class="muted" id="sLeft">not detected</div></div>
+    <div class="card"><h3 style="color:#ff8a3d">RIGHT HAND</h3><div class="big" id="gRight">–</div><div class="muted" id="sRight">not detected</div></div>
+    <div class="card"><h3 style="color:#19d3a2">BOTH HANDS</h3><div class="big" id="gBoth">–</div><div class="muted" id="fps"></div></div>
+    <div class="card">
+      <h3>FINGER COLORS</h3>
+      <div class="legend">
+        <span><i style="background:#ff503c"></i>Thumb</span><span><i style="background:#ffc828"></i>Index</span><span><i style="background:#50dc50"></i>Middle</span>
+        <span><i style="background:#28b4ff"></i>Ring</span><span><i style="background:#c850dc"></i>Pinky</span><span><i style="background:#d2d2d2"></i>Palm</span>
+      </div>
+      <p class="muted">Gestures: Fist, Open Palm, Pointing Up, Thumb Up / Down, Victory, I Love You.</p>
+    </div>
+  </aside>
+</main>
+<video id="video" playsinline muted></video>
+
+<script type="module">
+import { FilesetResolver, GestureRecognizer, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const $ = (id) => document.getElementById(id);
+const video = $("video"), canvas = $("out"), ctx = canvas.getContext("2d");
+video.style.display = "none";
+
+const FINGER = ["#d2d2d2", "#ff503c", "#ffc828", "#50dc50", "#28b4ff", "#c850dc"];   // palm, thumb, index, middle, ring, pinky
+const fingerOf = (i) => (i === 0 ? 0 : Math.floor((i - 1) / 4) + 1);
+const HAND = { Left: "#4aa3ff", Right: "#ff8a3d" };
+const NAMES = { Closed_Fist: "Fist", Open_Palm: "Open Palm", Pointing_Up: "Pointing Up", Thumb_Down: "Thumb Down", Thumb_Up: "Thumb Up", Victory: "Victory", ILoveYou: "I Love You", None: "–" };
+const COMBOS = {
+  "Thumb_Up": "Double Thumbs Up", "Thumb_Down": "Double Thumbs Down", "Open_Palm": "Hands Up / Stop", "Closed_Fist": "Double Fist",
+  "Victory": "Double Victory", "Pointing_Up": "Both Pointing Up", "ILoveYou": "Double I Love You",
+  "Thumb_Down+Thumb_Up": "Mixed Thumbs", "Closed_Fist+Open_Palm": "Palm + Fist", "Open_Palm+Pointing_Up": "Point + Palm",
+};
+
+class Stable {   // switch the shown label only after it is seen 3 frames in a row
+  constructor() { this.current = "None"; this.cand = "None"; this.n = 0; }
+  update(l) { if (l === this.current) { this.cand = l; this.n = 0; } else if (l === this.cand) { if (++this.n >= 3) { this.current = l; this.n = 0; } } else { this.cand = l; this.n = 1; } return this.current; }
+}
+const stable = { Left: new Stable(), Right: new Stable() };
+
+let recognizer;
+async function load() {
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const opts = (delegate) => ({ baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task", delegate },
+    runningMode: "VIDEO", numHands: 2 });
+  // CPU on purpose: in testing, the GPU delegate's palm detector missed the second hand that CPU finds
+  recognizer = await GestureRecognizer.createFromOptions(vision, opts("CPU"));
+  $("btnCam").disabled = false;
+  msg("Ready. Start your camera or choose a video file.");
+}
+
+let mirror = true, running = false, stream = null;
+async function startCamera() {
+  try {
+    stopSource();
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream; mirror = true; await video.play(); begin();
+  } catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function startFile(f) { stopSource(); video.srcObject = null; video.src = URL.createObjectURL(f); video.loop = true; mirror = false; video.play().then(begin); }
+function stopSource() { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; }
+function begin() { hideMsg(); if (!running) { running = true; requestAnimationFrame(loop); } }
+
+let lastTs = -1, fps = 0, lastT = performance.now();
+function loop() {
+  requestAnimationFrame(loop);
+  if (!recognizer || video.readyState < 2) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  ctx.save(); if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, w, h); ctx.restore();
+
+  const ts = Math.max(performance.now(), lastTs + 1); lastTs = ts;
+  const res = recognizer.recognizeForVideo(video, ts);
+  const handed = res.handedness || res.handednesses || [];
+  const lms = res.landmarks || [];
+  const minScore = parseFloat($("minScore").value);
+  const X = (x) => (mirror ? 1 - x : x) * w;
+
+  // MediaPipe labels hands as if the image were mirrored; our input is the raw (un-mirrored) frame, so swap.
+  let sides = lms.map((_, i) => ((handed[i] && handed[i][0] && handed[i][0].categoryName) === "Left" ? "Right" : "Left"));
+  if (sides.length === 2 && sides[0] === sides[1]) {   // both got the same label: decide by screen position
+    const sx = lms.map((l) => l.reduce((s, p) => s + X(p.x), 0));
+    const leftIdx = mirror ? (sx[0] < sx[1] ? 0 : 1) : (sx[0] > sx[1] ? 0 : 1);
+    sides = [0, 1].map((i) => (i === leftIdx ? "Left" : "Right"));
+  }
+
+  const seen = { Left: null, Right: null };
+  lms.slice(0, 2).forEach((lm, i) => {
+    const side = sides[i];
+    const top = res.gestures && res.gestures[i] && res.gestures[i][0];
+    let g = top ? top.categoryName || "None" : "None";
+    const score = top ? top.score : 0;
+    if (score < minScore) g = "None";
+    g = stable[side].update(g);
+    seen[side] = { g, score };
+    const pts = lm.map((p) => [X(p.x), p.y * h]);
+    const lw = Math.max(3, w / 300);
+    for (const c of HandLandmarker.HAND_CONNECTIONS) {
+      ctx.strokeStyle = FINGER[Math.max(fingerOf(c.start), fingerOf(c.end))]; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(...pts[c.start]); ctx.lineTo(...pts[c.end]); ctx.stroke();
+    }
+    pts.forEach((p, k) => {
+      const r = ([4, 8, 12, 16, 20].includes(k) ? 7 : 5) * (w / 1280 + 0.4);
+      ctx.fillStyle = HAND[side]; ctx.beginPath(); ctx.arc(p[0], p[1], r + 2, 0, 7); ctx.fill();
+      ctx.fillStyle = FINGER[fingerOf(k)]; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fill();
+    });
+    const minY = Math.min(...pts.map((p) => p[1])), cxp = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+    const text = `${side}: ${NAMES[g] || g}`;
+    ctx.font = `600 ${Math.max(16, w / 50)}px Segoe UI, sans-serif`;
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle = HAND[side]; ctx.fillRect(cxp - tw / 2 - 10, minY - 46, tw + 20, 34);
+    ctx.fillStyle = "#fff"; ctx.fillText(text, cxp - tw / 2, minY - 21);
+  });
+  for (const side of ["Left", "Right"]) {
+    if (!seen[side]) stable[side].update("None");
+    $("g" + side).textContent = seen[side] ? (NAMES[seen[side].g] || seen[side].g) : "–";
+    $("s" + side).textContent = seen[side] ? `${Math.round(seen[side].score * 100)}% confidence` : "not detected";
+  }
+  let both = "–";
+  if (seen.Left && seen.Right && seen.Left.g !== "None" && seen.Right.g !== "None") {
+    const key = [...new Set([seen.Left.g, seen.Right.g])].sort().join("+");
+    both = COMBOS[key] || `${NAMES[seen.Left.g]} + ${NAMES[seen.Right.g]}`;
+  }
+  $("gBoth").textContent = both;
+  const now = performance.now(); fps = 0.9 * fps + 0.1 * (1000 / Math.max(1, now - lastT)); lastT = now;
+  $("fps").textContent = `${fps.toFixed(0)} FPS`;
+}
+
+function msg(t, err) { const m = $("msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); m.style.display = ""; }
+function hideMsg() { $("msg").style.display = "none"; }
+$("btnCam").onclick = startCamera;
+$("file").onchange = (e) => e.target.files[0] && startFile(e.target.files[0]);
+$("minScore").oninput = (e) => { $("minVal").textContent = (+e.target.value).toFixed(2); };
+load().catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit2_3 · AI Fitness Coach</title>
+<style>
+  :root { --bg: #0b0f17; --panel: #131a26; --panel2: #1a2333; --border: #263247; --text: #e6ebf3; --muted: #8a97ab; --accent: #19d3a2; --accent2: #4aa3ff; --warn: #ffd166; --danger: #ff5c7a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--border); background: #0f1622; }
+  header h1 { margin: 0; font-size: 19px; } header h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  header a { color: var(--accent2); text-decoration: none; font-size: 14px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: #05080d; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; }
+  canvas { max-width: 100%; max-height: 100%; display: block; }
+  .msg { position: absolute; inset: auto 16px 16px 16px; text-align: center; background: rgba(10, 14, 22, .85); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .msg.err { border-color: var(--danger); color: #ffd0d9; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button, .filebtn { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  button:hover, .filebtn:hover { border-color: var(--accent2); }
+  button.primary { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #04121b; border: 0; font-weight: 600; }
+  .filebtn input { display: none; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; transition: box-shadow .2s, border-color .2s; }
+  .card h3 { margin: 0 0 6px; font-size: 14px; letter-spacing: .4px; }
+  .card.flash { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(25, 211, 162, .35); }
+  .reps { font-size: 56px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .row { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .bar { height: 8px; background: var(--panel2); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .bar div { height: 100%; width: 0; transition: width .1s; }
+  .tip { margin-top: 8px; color: var(--warn); font-size: 13.5px; min-height: 20px; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .hint ul { padding-left: 18px; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>unit2_3 · AI Fitness Coach <small>arm-curl rep counter · MediaPipe Pose</small></h1>
+  <a href="../unit.html?unit=2">← Back to Unit 2</a>
+</header>
+<main>
+  <section>
+    <div class="stage"><canvas id="out" width="1280" height="720"></canvas><div class="msg" id="msg">Loading the pose model…</div></div>
+    <div class="controls">
+      <button class="primary" id="btnCam" disabled>🎥 Start camera</button>
+      <label class="filebtn">📁 Use a video file<input type="file" id="file" accept="video/*"></label>
+      <button id="btnReset">↺ Reset counters</button>
+    </div>
+  </section>
+  <aside>
+    <div class="card" id="cardLeft"><h3 style="color:#4aa3ff">LEFT ARM</h3><div class="reps" id="repsLeft">0</div>
+      <div class="row"><span id="angleLeft">– °</span><span id="stageLeft">waiting</span></div>
+      <div class="bar"><div id="barLeft" style="background:#4aa3ff"></div></div><div class="tip" id="tipLeft">Straighten your arm to start</div></div>
+    <div class="card" id="cardRight"><h3 style="color:#ff8a3d">RIGHT ARM</h3><div class="reps" id="repsRight">0</div>
+      <div class="row"><span id="angleRight">– °</span><span id="stageRight">waiting</span></div>
+      <div class="bar"><div id="barRight" style="background:#ff8a3d"></div></div><div class="tip" id="tipRight">Straighten your arm to start</div></div>
+    <div class="card hint">
+      <b>One rep = straight → bent → straight.</b> Left and right arms are counted separately.
+      <ul><li>Keep shoulders, elbows and wrists in view</li><li>Straight ≥ 155°, fully bent ≤ 50°</li><li>Half reps are flagged, not counted</li></ul>
+    </div>
+  </aside>
+</main>
+<video id="video" playsinline muted></video>
+
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const STRAIGHT = 155, BENT = 50, HALF = 100;
+const ARMS = { Left: [11, 13, 15], Right: [12, 14, 16] };   // MediaPipe indices = the person's own left / right
+const COLORS = { Left: "#4aa3ff", Right: "#ff8a3d" };
+const $ = (id) => document.getElementById(id);
+const video = $("video"), canvas = $("out"), ctx = canvas.getContext("2d");
+video.style.display = "none";
+
+class ArmCounter {
+  constructor(side) { this.side = side; this.reset(); }
+  reset() { this.reps = 0; this.stage = "waiting"; this.angle = null; this.smooth = null; this.minSinceStraight = 180; this.maxSinceBent = 0; this.tip = "Straighten your arm to start"; }
+  update(raw) {
+    if (raw == null) { this.angle = null; this.tip = "Arm not visible"; return false; }
+    this.smooth = this.smooth == null ? raw : 0.6 * this.smooth + 0.4 * raw;
+    const a = this.angle = this.smooth;
+    if (this.stage !== "bent") {
+      this.minSinceStraight = Math.min(this.minSinceStraight, a);
+      if (a >= STRAIGHT) {
+        if (this.stage === "straight" && this.minSinceStraight < HALF) this.tip = "Half rep! Bend all the way";
+        else if (this.stage === "waiting") this.tip = "Good, now bend your arm";
+        this.stage = "straight"; this.minSinceStraight = a;
+      } else if (a <= BENT && this.stage === "straight") {
+        this.stage = "bent"; this.maxSinceBent = a; this.tip = "Now straighten fully";
+      } else if (this.stage === "straight" && !this.tip.startsWith("Half")) this.tip = "Keep bending…";
+      return false;
+    }
+    this.maxSinceBent = Math.max(this.maxSinceBent, a);
+    if (a >= STRAIGHT) { this.reps++; this.stage = "straight"; this.minSinceStraight = a; this.tip = "Rep counted!"; return true; }
+    if (a <= BENT && this.maxSinceBent > HALF) { this.tip = "Half rep! Extend all the way"; this.maxSinceBent = a; }
+    else if (!this.tip.startsWith("Half")) this.tip = "Keep extending…";
+    return false;
+  }
+}
+const counters = { Left: new ArmCounter("Left"), Right: new ArmCounter("Right") };
+
+function angleAt(a, b, c) {
+  const abx = a.x - b.x, aby = a.y - b.y, cbx = c.x - b.x, cby = c.y - b.y;
+  const n = Math.hypot(abx, aby) * Math.hypot(cbx, cby);
+  return n < 1e-6 ? 180 : Math.acos(Math.max(-1, Math.min(1, (abx * cbx + aby * cby) / n))) * 180 / Math.PI;
+}
+
+/* ---------- Model ---------- */
+let landmarker;
+async function load() {
+  const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const opts = (delegate) => ({ baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task", delegate },
+    runningMode: "VIDEO", numPoses: 1 });
+  try { landmarker = await PoseLandmarker.createFromOptions(vision, opts("GPU")); }
+  catch (e) { landmarker = await PoseLandmarker.createFromOptions(vision, opts("CPU")); }
+  $("btnCam").disabled = false;
+  msg("Ready. Start your camera or choose a video file.");
+}
+
+/* ---------- Sources ---------- */
+let mirror = true, running = false, stream = null;
+async function startCamera() {
+  try {
+    stopSource();
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream; mirror = true;
+    await video.play(); begin();
+  } catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function startFile(f) {
+  stopSource();
+  video.srcObject = null; video.src = URL.createObjectURL(f); video.loop = true; mirror = false;
+  video.play().then(begin);
+}
+function stopSource() { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; }
+function begin() { hideMsg(); Object.values(counters).forEach((c) => c.reset()); if (!running) { running = true; requestAnimationFrame(loop); } }
+
+/* ---------- Loop ---------- */
+let lastTs = -1;
+function loop() {
+  requestAnimationFrame(loop);
+  if (!landmarker || video.readyState < 2) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  ctx.save();
+  if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, 0, 0, w, h);
+  ctx.restore();
+
+  const ts = Math.max(performance.now(), lastTs + 1); lastTs = ts;
+  const res = landmarker.detectForVideo(video, ts);   // detection runs on the un-mirrored frame -> anatomical left/right
+  const lm = res.landmarks && res.landmarks[0];
+  const P = (p) => ({ x: (mirror ? 1 - p.x : p.x) * w, y: p.y * h });
+  if (lm) {
+    ctx.lineWidth = Math.max(2, w / 400); ctx.strokeStyle = "rgba(220,220,220,.7)";
+    for (const c of PoseLandmarker.POSE_CONNECTIONS) {
+      if (c.start < 11 || c.end < 11) continue;
+      const a = P(lm[c.start]), b = P(lm[c.end]);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+  }
+  for (const side of ["Left", "Right"]) {
+    const [s, e, wr] = ARMS[side];
+    let raw = null;
+    if (lm && [s, e, wr].every((i) => (lm[i].visibility ?? 1) >= 0.5)) {
+      const pts = [lm[s], lm[e], lm[wr]].map((p) => ({ x: p.x * w, y: p.y * h }));
+      raw = angleAt(...pts);
+      const d = [lm[s], lm[e], lm[wr]].map(P);
+      ctx.strokeStyle = COLORS[side]; ctx.lineWidth = Math.max(5, w / 160);
+      ctx.beginPath(); ctx.moveTo(d[0].x, d[0].y); ctx.lineTo(d[1].x, d[1].y); ctx.lineTo(d[2].x, d[2].y); ctx.stroke();
+      ctx.fillStyle = "#fff"; d.forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(6, w / 150), 0, 7); ctx.fill(); });
+      ctx.font = `600 ${Math.max(16, w / 45)}px Segoe UI, sans-serif`; ctx.fillStyle = COLORS[side];
+      ctx.fillText(`${Math.round(counters[side].smooth ?? raw)}°`, d[1].x + 12, d[1].y - 12);
+    }
+    if (counters[side].update(raw)) flash(side);
+    renderCard(side);
+  }
+}
+
+function renderCard(side) {
+  const c = counters[side];
+  $("reps" + side).textContent = c.reps;
+  $("angle" + side).textContent = c.angle == null ? "– °" : `${Math.round(c.angle)}°`;
+  $("stage" + side).textContent = c.stage;
+  $("tip" + side).textContent = c.tip;
+  const pct = c.angle == null ? 0 : Math.max(0, Math.min(1, (STRAIGHT - c.angle) / (STRAIGHT - BENT)));
+  $("bar" + side).style.width = `${pct * 100}%`;
+}
+function flash(side) { const el = $("card" + side); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 400); }
+function msg(t, err) { const m = $("msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); m.style.display = ""; }
+function hideMsg() { $("msg").style.display = "none"; }
+
+$("btnCam").onclick = startCamera;
+$("file").onchange = (e) => e.target.files[0] && startFile(e.target.files[0]);
+$("btnReset").onclick = () => Object.values(counters).forEach((c) => { c.reset(); renderCard(c.side); });
+load().catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>

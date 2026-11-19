@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>unit3_2 · YOLO26 Detection Studio</title>
+  <style>
+:root {
+  --bg: #0b0f17;
+  --panel: #131a26;
+  --panel-2: #1a2333;
+  --border: #263247;
+  --text: #e6ebf3;
+  --muted: #8a97ab;
+  --accent: #19d3a2;
+  --accent-2: #4aa3ff;
+  --danger: #ff5c7a;
+  --radius: 12px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-weight: 400; }
+
+/* Top bar */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px 22px; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, #0f1622, #101b2a); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { font-size: 30px; color: var(--accent); text-shadow: 0 0 14px rgba(25, 211, 162, .6); }
+.brand h1 { margin: 0; font-size: 19px; letter-spacing: .3px; }
+.brand p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.status-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { padding: 4px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border);
+  font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pill.ok { border-color: rgba(25, 211, 162, .5); color: var(--accent); }
+.pill.err { border-color: rgba(255, 92, 122, .6); color: var(--danger); }
+
+/* Layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; padding: 18px 22px; }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.card h3 { margin: 0 0 10px; font-size: 14px; letter-spacing: .3px; }
+.side { display: flex; flex-direction: column; gap: 14px; }
+
+/* Stage */
+.stage { position: relative; background: #05080d; border: 1px solid var(--border); border-radius: var(--radius);
+  width: 100%; min-height: 200px; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#view { max-width: 100%; max-height: 100%; display: block; }
+.stage.drawing #view { cursor: crosshair; }
+.stage-empty { position: absolute; text-align: center; color: var(--muted); padding: 20px; }
+.stage-empty .big { font-size: 64px; color: var(--border); }
+.stage-msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(10, 14, 22, .88);
+  border: 1px solid var(--border); padding: 12px 18px; border-radius: 10px; max-width: 80%; text-align: center; }
+.stage-msg.err { border-color: var(--danger); color: #ffd0d9; }
+.line-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(74, 163, 255, .9);
+  color: #fff; padding: 6px 12px; border-radius: 999px; font-size: 13px; }
+
+/* Toolbar */
+.toolbar { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.toolbar .group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#seek { width: 220px; }
+.toolbar select { width: auto; }
+.time { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 92px; }
+button { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent-2); }
+button.on { border-color: var(--accent); color: var(--accent); }
+button.rec { border-color: var(--danger); color: var(--danger); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .55; } }
+button.primary { background: linear-gradient(90deg, var(--accent), var(--accent-2)); border: 0; color: #04121b; font-weight: 600; width: 100%; margin-top: 10px; }
+button:disabled { opacity: .5; cursor: wait; }
+
+/* Panels */
+.panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .panels { grid-template-columns: 1fr; } #seek { width: 140px; } }
+#chart { width: 100%; display: block; }
+.counts { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.counts th, .counts td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--border); }
+.counts th { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+.counts td:not(:first-child), .counts th:not(:first-child) { text-align: right; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+
+/* Sidebar controls */
+label { display: block; margin: 10px 0 5px; color: var(--muted); font-size: 12.5px; }
+label b { color: var(--text); }
+input[type=text], select { width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13.5px; margin: 7px 0; }
+.row { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
+.row select { flex: 1; }
+.row button.primary { width: auto; flex: 1; margin-top: 0; }
+.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--panel-2); padding: 4px; border-radius: 10px; }
+.tabs button { border: 0; background: transparent; padding: 6px 2px; font-size: 12.5px; }
+.tabs button.active { background: var(--panel); color: var(--accent); box-shadow: 0 0 0 1px var(--border); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.presets button { font-size: 12px; padding: 4px 8px; }
+.progress { position: relative; height: 22px; background: var(--panel-2); border-radius: 6px; margin-top: 10px; overflow: hidden; }
+.progress div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s; }
+.progress span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.drop { display: flex; align-items: center; justify-content: center; min-height: 110px; border: 2px dashed var(--border);
+  border-radius: 10px; cursor: pointer; text-align: center; padding: 10px; color: var(--muted); margin: 0; }
+.drop.over { border-color: var(--accent); color: var(--accent); }
+.groups { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.groups button { font-size: 12px; padding: 4px 9px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 190px; overflow-y: auto; margin-top: 8px; padding-right: 4px; }
+.chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); }
+.chip.on { color: #fff; border-color: transparent; }
+#btnExport { width: 100%; margin-top: 8px; }
+
+  .back { color: var(--accent-2); text-decoration: none; font-size: 14px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◎</span>
+    <div>
+      <h1>unit3_2 · YOLO26 Detection Studio</h1>
+      <p>Ultralytics <b>yolo26n</b> running 100% in your browser · ONNX Runtime Web</p>
+    </div>
+  </div>
+  <a class="back" href="../unit.html?unit=3">← Back to Unit 3</a>
+  <div class="status-pills">
+    <span class="pill" id="pillModel">Model: loading…</span>
+    <span class="pill" id="pillBackend">Backend: –</span>
+    <span class="pill" id="pillFps">0 FPS</span>
+    <span class="pill" id="pillInfer">– ms</span>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ============ Stage ============ -->
+  <section class="stage-col">
+    <div class="stage" id="stage">
+      <canvas id="view"></canvas>
+      <div class="stage-empty" id="stageEmpty">
+        <div class="big">◎</div>
+        <p>Pick a source on the right: <b>Live CCTV</b>, <b>Webcam</b> or a <b>video / image file</b>.</p>
+      </div>
+      <div class="stage-msg hidden" id="stageMsg"></div>
+      <div class="line-hint hidden" id="lineHint">Click and drag on the video to draw the counting line</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="group" id="videoControls">
+        <button id="btnPlay" title="Play / pause (Space)">⏯</button>
+        <input type="range" id="seek" min="0" max="1000" value="0" title="Seek">
+        <span class="time" id="timeLabel">0:00 / 0:00</span>
+        <select id="speed" title="Playback speed">
+          <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+        </select>
+      </div>
+      <div class="group">
+        <button id="btnDetect" class="on" title="Pause / resume detection (D)">● Detecting</button>
+        <button id="btnLine" title="Draw a counting line">↔ Line</button>
+        <button id="btnClearLine" title="Remove the counting line">✕ Line</button>
+        <button id="btnSnap" title="Save annotated snapshot (S)">📷 Snapshot</button>
+        <button id="btnRec" title="Record annotated video">⏺ Record</button>
+        <button id="btnReset" title="Reset counters">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- Live charts & tables -->
+    <div class="panels">
+      <div class="card">
+        <h3>Objects over time</h3>
+        <canvas id="chart" height="120"></canvas>
+      </div>
+      <div class="card">
+        <h3>Detections <span class="muted" id="detTotal"></span></h3>
+        <table class="counts">
+          <thead><tr><th>Class</th><th>Now</th><th>Unique</th><th>Line ↑</th><th>Line ↓</th></tr></thead>
+          <tbody id="countsBody"><tr><td colspan="5" class="muted">No detections yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="side">
+    <div class="card">
+      <h3>Source</h3>
+      <div class="tabs" id="tabs" style="grid-template-columns:repeat(3,1fr)">
+        <button data-tab="cctv" class="active">📡 CCTV</button>
+        <button data-tab="webcam">🎥 Webcam</button>
+        <button data-tab="file">📁 File</button>
+      </div>
+
+      <div class="tab" data-panel="cctv">
+        <label>Live MJPEG stream URL</label>
+        <input id="cctvUrl" type="text" value="https://cctv.klcg.gov.tw/facd4662">
+        <div class="presets" id="cctvPresets"></div>
+        <button class="primary" id="btnCctv">Connect live feed</button>
+        <p class="hint">Live public traffic camera in Keelung, analysed directly in your browser. Sports videos: download a clip and use the <b>File</b> tab.</p>
+      </div>
+
+      <div class="tab hidden" data-panel="webcam">
+        <button class="primary" id="btnCam">Start webcam</button>
+        <label class="check"><input type="checkbox" id="camMirror" checked> Mirror view</label>
+      </div>
+
+      <div class="tab hidden" data-panel="file">
+        <label class="drop" id="drop">
+          <input type="file" id="fileInput" accept="video/*,image/*" hidden>
+          <span>Drop a video or image here, or <u>browse</u></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Detection</h3>
+      <label>Confidence <b id="confVal">0.35</b></label>
+      <input type="range" id="conf" min="0.05" max="0.95" step="0.05" value="0.35">
+      <label>Max detection rate <b id="rateVal">Unlimited</b></label>
+      <input type="range" id="rate" min="1" max="31" step="1" value="31">
+      <label>Backend</label>
+      <select id="backend">
+        <option value="webgpu">WebGPU (fastest, if supported)</option>
+        <option value="wasm">WASM (CPU, works everywhere)</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h3>Classes <span class="muted" id="classCount"></span></h3>
+      <div class="groups">
+        <button data-group="all">All</button>
+        <button data-group="people">People</button>
+        <button data-group="vehicles">Vehicles</button>
+        <button data-group="sports">Sports</button>
+        <button data-group="animals">Animals</button>
+        <button data-group="none">None</button>
+      </div>
+      <input id="classSearch" type="text" placeholder="Filter classes…">
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="card">
+      <h3>Display</h3>
+      <label class="check"><input type="checkbox" id="optLabels" checked> Labels &amp; confidence</label>
+      <label class="check"><input type="checkbox" id="optIds" checked> Tracking IDs</label>
+      <label class="check"><input type="checkbox" id="optTrails" checked> Motion trails</label>
+      <label class="check"><input type="checkbox" id="optHeat"> Heatmap</label>
+      <label class="check"><input type="checkbox" id="optBlur"> Blur people (privacy)</label>
+      <button id="btnExport">⬇ Export stats (JSON)</button>
+    </div>
+  </aside>
+</main>
+
+<video id="video" playsinline muted crossorigin="anonymous" class="hidden"></video>
+<img id="mjpeg" class="hidden" alt="">
+<script>
+/* YOLO26 Detection Studio - all inference runs in the browser with ONNX Runtime Web. */
+"use strict";
+
+const MODEL_URL = "assets/models/yolo26n.onnx";
+const INPUT = 640;
+const ORT_CDN = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+
+const COCO = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
+  "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant",
+  "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+  "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle",
+  "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli",
+  "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet",
+  "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
+  "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"];
+
+const GROUPS = {
+  people: ["person"],
+  vehicles: ["bicycle", "car", "motorcycle", "bus", "truck", "train", "traffic light", "stop sign"],
+  sports: ["person", "sports ball", "tennis racket", "baseball bat", "baseball glove", "skateboard", "surfboard",
+    "frisbee", "skis", "snowboard", "kite"],
+  animals: ["bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"],
+};
+
+// Distinct, readable class colors (golden-angle hues)
+const COLORS = COCO.map((_, i) => `hsl(${(i * 137.508) % 360}, 85%, 58%)`);
+
+const $ = (id) => document.getElementById(id);
+const view = $("view"), vctx = view.getContext("2d");
+const videoEl = $("video"), mjpegEl = $("mjpeg");
+
+/* ================= State ================= */
+const state = {
+  session: null, backend: null, loadingModel: false,
+  source: null,            // { kind: 'cctv'|'video'|'webcam'|'image', el, label }
+  detecting: true,
+  conf: 0.35,
+  minInterval: 0,          // ms between inferences (0 = as fast as possible)
+  enabled: new Set(COCO.map((_, i) => i)),
+  dets: [],                // latest detections (source pixel coords)
+  inferMs: 0, fps: 0,
+  line: null, drawingLine: false, lineDraft: null,
+  heat: null,
+  recorder: null, recChunks: [],
+  history: [],             // total objects per inference, for the chart
+};
+
+/* ================= Model ================= */
+async function loadModel(backend) {
+  state.loadingModel = true;
+  setPill("pillModel", "Model: loading…");
+  ort.env.wasm.wasmPaths = ORT_CDN;
+  if (self.crossOriginIsolated) ort.env.wasm.numThreads = Math.min(8, navigator.hardwareConcurrency || 4);
+  const tryOrder = backend === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
+  let lastErr;
+  for (const ep of tryOrder) {
+    try {
+      if (ep === "webgpu" && !navigator.gpu) throw new Error("WebGPU not available in this browser");
+      const session = await ort.InferenceSession.create(MODEL_URL, { executionProviders: [ep], graphOptimizationLevel: "all" });
+      // Warm-up run (the first inference compiles kernels)
+      await session.run({ [session.inputNames[0]]: new ort.Tensor("float32", new Float32Array(3 * INPUT * INPUT), [1, 3, INPUT, INPUT]) });
+      state.session = session;
+      state.backend = ep;
+      setPill("pillModel", "Model: yolo26n ✓", "ok");
+      setPill("pillBackend", `Backend: ${ep.toUpperCase()}${ep === "wasm" && self.crossOriginIsolated ? ` ×${ort.env.wasm.numThreads}` : ""}`, "ok");
+      $("backend").value = ep;
+      state.loadingModel = false;
+      return;
+    } catch (e) {
+      lastErr = e;
+      console.warn(`Backend ${ep} failed:`, e);
+    }
+  }
+  state.loadingModel = false;
+  setPill("pillModel", "Model: failed", "err");
+  showMsg(`Could not load the model: ${lastErr && lastErr.message}`, true);
+}
+
+/* ================= Pre / post processing ================= */
+const pre = document.createElement("canvas");
+pre.width = pre.height = INPUT;
+const pctx = pre.getContext("2d", { willReadFrequently: true });
+const inputData = new Float32Array(3 * INPUT * INPUT);
+
+function letterbox(src, w, h) {
+  const scale = Math.min(INPUT / w, INPUT / h);
+  const nw = Math.round(w * scale), nh = Math.round(h * scale);
+  const padX = Math.floor((INPUT - nw) / 2), padY = Math.floor((INPUT - nh) / 2);
+  pctx.fillStyle = "rgb(114,114,114)";
+  pctx.fillRect(0, 0, INPUT, INPUT);
+  pctx.drawImage(src, 0, 0, w, h, padX, padY, nw, nh);
+  const px = pctx.getImageData(0, 0, INPUT, INPUT).data;
+  const N = INPUT * INPUT;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    inputData[i] = px[j] / 255;
+    inputData[N + i] = px[j + 1] / 255;
+    inputData[2 * N + i] = px[j + 2] / 255;
+  }
+  return { scale, padX, padY };
+}
+
+function iou(a, b) {
+  const x1 = Math.max(a.x1, b.x1), y1 = Math.max(a.y1, b.y1);
+  const x2 = Math.min(a.x2, b.x2), y2 = Math.min(a.y2, b.y2);
+  const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  const u = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1) - inter;
+  return u > 0 ? inter / u : 0;
+}
+
+function decode(output, lb, w, h) {
+  const d = output.dims, data = output.data, out = [];
+  const toSrc = (x, y) => [(x - lb.padX) / lb.scale, (y - lb.padY) / lb.scale];
+  const push = (x1, y1, x2, y2, score, cls) => {
+    if (score < state.conf || !state.enabled.has(cls)) return;
+    const [a, b] = toSrc(x1, y1), [c, e] = toSrc(x2, y2);
+    out.push({ x1: Math.max(0, a), y1: Math.max(0, b), x2: Math.min(w, c), y2: Math.min(h, e), score, cls });
+  };
+  if (d.length === 3 && d[2] === 6) {
+    // YOLO26 end-to-end (NMS-free) output: [1, N, 6] = x1, y1, x2, y2, score, class
+    for (let i = 0; i < d[1]; i++) {
+      const o = i * 6;
+      push(data[o], data[o + 1], data[o + 2], data[o + 3], data[o + 4], Math.round(data[o + 5]));
+    }
+    return out;
+  }
+  // Classic YOLO output [1, 4 + C, A] (cx, cy, w, h, class scores) -> needs NMS
+  const C = d[1] - 4, A = d[2], cand = [];
+  for (let a = 0; a < A; a++) {
+    let best = 0, cls = 0;
+    for (let c = 0; c < C; c++) { const s = data[(4 + c) * A + a]; if (s > best) { best = s; cls = c; } }
+    if (best < state.conf || !state.enabled.has(cls)) continue;
+    const cx = data[a], cy = data[A + a], bw = data[2 * A + a], bh = data[3 * A + a];
+    cand.push({ x1: cx - bw / 2, y1: cy - bh / 2, x2: cx + bw / 2, y2: cy + bh / 2, score: best, cls });
+  }
+  cand.sort((p, q) => q.score - p.score);
+  const keep = [];
+  for (const c of cand) if (!keep.some((k) => k.cls === c.cls && iou(k, c) > 0.45)) keep.push(c);
+  for (const k of keep) push(k.x1, k.y1, k.x2, k.y2, k.score, k.cls);
+  return out;
+}
+
+/* ================= Tracker (IoU + distance, greedy) ================= */
+const tracker = {
+  nextId: 1, tracks: [], unique: {}, lineUp: {}, lineDown: {},
+  reset() { this.nextId = 1; this.tracks = []; this.unique = {}; this.lineUp = {}; this.lineDown = {}; },
+  update(dets) {
+    const pairs = [];
+    for (let ti = 0; ti < this.tracks.length; ti++) {
+      const t = this.tracks[ti];
+      for (let di = 0; di < dets.length; di++) {
+        const d = dets[di];
+        if (d.cls !== t.cls) continue;
+        const ov = iou(t.box, d);
+        const dist = Math.hypot(cx(t.box) - cx(d), cy(t.box) - cy(d));
+        const diag = Math.hypot(t.box.x2 - t.box.x1, t.box.y2 - t.box.y1);
+        if (ov > 0.15 || dist < diag * 0.6) pairs.push([ov - dist / (diag * 10 + 1), ti, di]);
+      }
+    }
+    pairs.sort((a, b) => b[0] - a[0]);
+    const usedT = new Set(), usedD = new Set();
+    for (const [, ti, di] of pairs) {
+      if (usedT.has(ti) || usedD.has(di)) continue;
+      usedT.add(ti); usedD.add(di);
+      const t = this.tracks[ti], d = dets[di];
+      t.box = d; t.missed = 0; t.hits++;
+      t.trail.push([cx(d), cy(d)]); if (t.trail.length > 30) t.trail.shift();
+      d.id = t.id;
+      if (t.hits === 3) this.unique[t.cls] = (this.unique[t.cls] || 0) + 1;
+      if (t.hits >= 3) this.checkLine(t);
+    }
+    // Age unmatched existing tracks *before* adding new ones (indices refer to the old list)
+    for (let ti = 0; ti < this.tracks.length; ti++) if (!usedT.has(ti)) this.tracks[ti].missed++;
+    for (let di = 0; di < dets.length; di++) {
+      if (usedD.has(di)) continue;
+      const d = dets[di];
+      const t = { id: this.nextId++, cls: d.cls, box: d, hits: 1, missed: 0, trail: [[cx(d), cy(d)]], side: null };
+      d.id = t.id;
+      this.tracks.push(t);
+    }
+    // Confirmed tracks survive 15 missed frames; tentative ones 2 (tolerates flickering detections)
+    this.tracks = this.tracks.filter((t) => t.missed <= (t.hits >= 3 ? 15 : 2));
+    for (const d of dets) {
+      const t = this.tracks.find((tr) => tr.id === d.id);
+      d.confirmed = t && t.hits >= 3;
+      d.trail = t ? t.trail : null;
+    }
+  },
+  checkLine(t) {
+    const L = state.line;
+    if (!L) return;
+    const p = [cx(t.box), cy(t.box)];
+    const side = Math.sign((L.x2 - L.x1) * (p[1] - L.y1) - (L.y2 - L.y1) * (p[0] - L.x1));
+    // Each track is counted at most once, so jitter on the line can't inflate the totals
+    if (!t.counted && t.side !== null && side !== 0 && side !== t.side && t.sidePt) {
+      // count only when the movement (from the last point clearly on one side) crosses the drawn segment
+      if (segmentsIntersect(t.sidePt, p, [L.x1, L.y1], [L.x2, L.y2])) {
+        const bucket = side > 0 ? this.lineDown : this.lineUp;
+        bucket[t.cls] = (bucket[t.cls] || 0) + 1;
+        t.counted = true;
+        L.flash = performance.now();
+      }
+    }
+    if (side !== 0) { t.side = side; t.sidePt = p; }
+  },
+};
+const cx = (b) => (b.x1 + b.x2) / 2, cy = (b) => (b.y1 + b.y2) / 2;
+function segmentsIntersect(p1, p2, p3, p4) {
+  const d = (a, b, c) => (c[0] - a[0]) * (b[1] - a[1]) - (b[0] - a[0]) * (c[1] - a[1]);
+  const d1 = d(p3, p4, p1), d2 = d(p3, p4, p2), d3 = d(p1, p2, p3), d4 = d(p1, p2, p4);
+  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+}
+
+/* ================= Heatmap ================= */
+const HEAT_W = 96, HEAT_H = 54;
+const heatCanvas = document.createElement("canvas");
+heatCanvas.width = HEAT_W; heatCanvas.height = HEAT_H;
+const hctx = heatCanvas.getContext("2d");
+function updateHeat(dets, w, h) {
+  if (!state.heat) state.heat = new Float32Array(HEAT_W * HEAT_H);
+  const H = state.heat;
+  for (let i = 0; i < H.length; i++) H[i] *= 0.985;
+  for (const d of dets) {
+    const gx = Math.floor((cx(d) / w) * HEAT_W), gy = Math.floor((d.y2 / h) * HEAT_H) - 1;  // feet / bottom point
+    for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) {
+      const X = gx + x, Y = gy + y;
+      if (X >= 0 && Y >= 0 && X < HEAT_W && Y < HEAT_H) H[Y * HEAT_W + X] += Math.exp(-(x * x + y * y) / 2);
+    }
+  }
+  let max = 1;
+  for (let i = 0; i < H.length; i++) if (H[i] > max) max = H[i];
+  const img = hctx.createImageData(HEAT_W, HEAT_H);
+  for (let i = 0; i < H.length; i++) {
+    const v = Math.min(1, H[i] / max);
+    // blue -> green -> yellow -> red
+    img.data[i * 4] = 255 * Math.min(1, Math.max(0, 2 * v - 0.5));
+    img.data[i * 4 + 1] = 255 * Math.min(1, 2 * v) * (v < 0.75 ? 1 : (1 - v) * 4);
+    img.data[i * 4 + 2] = 255 * Math.max(0, 1 - 2.5 * v);
+    img.data[i * 4 + 3] = v < 0.04 ? 0 : 150 * Math.sqrt(v);
+  }
+  hctx.putImageData(img, 0, 0);
+}
+
+/* ================= Sources ================= */
+function sourceSize() {
+  const s = state.source;
+  if (!s) return [0, 0];
+  if (s.kind === "cctv" || s.kind === "image") return [s.el.naturalWidth, s.el.naturalHeight];
+  return [s.el.videoWidth, s.el.videoHeight];
+}
+function sourceReady() {
+  const s = state.source;
+  if (!s) return false;
+  if (s.kind === "cctv" || s.kind === "image") return s.el.complete && s.el.naturalWidth > 0;
+  return s.el.readyState >= 2 && s.el.videoWidth > 0;
+}
+
+function stopSource() {
+  const s = state.source;
+  if (!s) return;
+  if (s.kind === "webcam" && s.stream) s.stream.getTracks().forEach((t) => t.stop());
+  if (s.kind === "cctv") mjpegEl.removeAttribute("src");
+  if (s.kind === "video" || s.kind === "webcam") { videoEl.pause(); videoEl.removeAttribute("src"); videoEl.srcObject = null; videoEl.load(); }
+  if (s.objectUrl) URL.revokeObjectURL(s.objectUrl);
+  state.source = null;
+  state.dets = [];
+  state.heat = null;
+  state.history = [];
+  tracker.reset();
+}
+
+function startSource(src) {
+  stopSource();
+  state.source = src;
+  $("stageEmpty").classList.add("hidden");
+  hideMsg();
+  $("videoControls").style.visibility = src.kind === "video" ? "visible" : "hidden";
+}
+
+function startCctv(url) {
+  if (!url) return;
+  showMsg("Connecting to live feed…");
+  startSource({ kind: "cctv", el: mjpegEl, label: url, mirror: false, connecting: true });
+  // MJPEG <img> streams don't fire onload reliably; render() clears the message on the first frame.
+  mjpegEl.onerror = () => showMsg("Could not open the live stream. It must be an MJPEG / JPEG camera link that allows browser access (CORS).", true);
+  mjpegEl.crossOrigin = "anonymous";
+  mjpegEl.removeAttribute("src");
+  mjpegEl.src = url;
+}
+
+function startVideoUrl(url, label) {
+  startSource({ kind: "video", el: videoEl, label, mirror: false });
+  videoEl.srcObject = null;
+  videoEl.src = url;
+  videoEl.loop = true;
+  videoEl.playbackRate = parseFloat($("speed").value);
+  videoEl.play().catch(() => showMsg("Press ⏯ to start the video."));
+}
+
+async function startWebcam() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    startSource({ kind: "webcam", el: videoEl, stream, label: "Webcam", mirror: $("camMirror").checked });
+    videoEl.src = "";
+    videoEl.srcObject = stream;
+    await videoEl.play();
+  } catch (e) {
+    showMsg(`Webcam not available: ${e.message}`, true);
+  }
+}
+
+function startFile(file) {
+  const url = URL.createObjectURL(file);
+  if (file.type.startsWith("image/")) {
+    const img = new Image();
+    startSource({ kind: "image", el: img, label: file.name, objectUrl: url, mirror: false });
+    img.src = url;
+  } else {
+    startVideoUrl(url, file.name);
+    state.source.objectUrl = url;
+  }
+}
+
+/* ================= Inference loop ================= */
+let lastInferAt = 0;
+async function inferLoop() {
+  for (;;) {
+    const now = performance.now();
+    const s = state.source;
+    const due = now - lastInferAt >= state.minInterval;
+    const paused = s && s.kind === "video" && videoEl.paused && state.dets.length && s.lastTime === videoEl.currentTime;
+    let worked = false;
+    if (state.session && state.detecting && s && sourceReady() && due && !paused && !state.loadingModel) {
+      worked = true;
+      const [w, h] = sourceSize();
+      try {
+        const t0 = performance.now();
+        const lb = letterbox(s.el, w, h);
+        const feeds = { [state.session.inputNames[0]]: new ort.Tensor("float32", inputData, [1, 3, INPUT, INPUT]) };
+        const res = await state.session.run(feeds);
+        const dets = decode(res[state.session.outputNames[0]], lb, w, h);
+        tracker.update(dets);
+        if ($("optHeat").checked) updateHeat(dets, w, h);
+        state.dets = dets;
+        state.inferMs = 0.8 * state.inferMs + 0.2 * (performance.now() - t0);
+        state.history.push(dets.length); if (state.history.length > 150) state.history.shift();
+        if (s.kind === "video") s.lastTime = videoEl.currentTime;
+        lastInferAt = now;
+        updateTable();
+        drawChart();
+      } catch (e) {
+        console.error(e);
+        showMsg(e.name === "SecurityError" ? "This camera does not allow browsers to read its pixels (no CORS header), so it can't be analysed from a web page. Try another camera or a video file." : `Inference error: ${e.message}`, true);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    // Timer-based (not requestAnimationFrame) so detection and line counting keep
+    // running when the tab is in the background or the window is minimized.
+    await new Promise((r) => setTimeout(r, worked ? 0 : 15));
+  }
+}
+
+/* ================= Rendering ================= */
+let frames = 0, fpsT0 = performance.now();
+function render() {
+  requestAnimationFrame(render);
+  const s = state.source;
+  if (!s || !sourceReady()) return;
+  if (s.connecting) { s.connecting = false; hideMsg(); }
+  const [w, h] = sourceSize();
+  if (view.width !== w || view.height !== h) { view.width = w; view.height = h; }
+
+  vctx.save();
+  if (s.mirror) { vctx.translate(w, 0); vctx.scale(-1, 1); }
+  vctx.drawImage(s.el, 0, 0, w, h);
+  vctx.restore();
+  const X = (x) => (s.mirror ? w - x : x);   // mirror detection coordinates for display
+  const lw = Math.max(2, Math.round(w / 400));
+
+  if ($("optBlur").checked) {
+    for (const d of state.dets) if (d.cls === 0) {
+      const x1 = Math.min(X(d.x1), X(d.x2)), bw = d.x2 - d.x1, bh = d.y2 - d.y1;
+      vctx.save();
+      vctx.beginPath(); vctx.rect(x1, d.y1, bw, bh); vctx.clip();
+      vctx.filter = `blur(${Math.max(8, bw / 8)}px)`;
+      vctx.drawImage(view, x1, d.y1, bw, bh, x1, d.y1, bw, bh);
+      vctx.restore();
+    }
+  }
+  if ($("optHeat").checked && state.heat) {
+    vctx.save(); vctx.imageSmoothingEnabled = true;
+    if (s.mirror) { vctx.translate(w, 0); vctx.scale(-1, 1); }
+    vctx.drawImage(heatCanvas, 0, 0, w, h);
+    vctx.restore();
+  }
+
+  const showLabels = $("optLabels").checked, showIds = $("optIds").checked, showTrails = $("optTrails").checked;
+  const font = Math.max(12, Math.round(w / 70));
+  vctx.font = `600 ${font}px "Segoe UI", system-ui, sans-serif`;
+  vctx.textBaseline = "top";
+  for (const d of state.dets) {
+    const color = COLORS[d.cls];
+    const x1 = Math.min(X(d.x1), X(d.x2)), x2 = Math.max(X(d.x1), X(d.x2));
+    if (showTrails && d.trail && d.trail.length > 1) {
+      vctx.strokeStyle = color; vctx.lineWidth = lw; vctx.globalAlpha = 0.7;
+      vctx.beginPath();
+      d.trail.forEach(([px, py], i) => (i ? vctx.lineTo(X(px), py) : vctx.moveTo(X(px), py)));
+      vctx.stroke(); vctx.globalAlpha = 1;
+    }
+    vctx.strokeStyle = color; vctx.lineWidth = lw;
+    vctx.setLineDash(d.confirmed ? [] : [6, 4]);
+    vctx.strokeRect(x1, d.y1, x2 - x1, d.y2 - d.y1);
+    vctx.setLineDash([]);
+    if (showLabels || showIds) {
+      let label = showLabels ? `${COCO[d.cls]} ${(d.score * 100).toFixed(0)}%` : "";
+      if (showIds && d.id) label = `#${d.id} ` + label;
+      const tw = vctx.measureText(label).width + 10, th = font + 6;
+      const ly = d.y1 - th < 0 ? d.y1 : d.y1 - th;
+      vctx.fillStyle = color; vctx.fillRect(x1 - lw / 2, ly, tw, th);
+      vctx.fillStyle = "#06101a"; vctx.fillText(label, x1 + 5, ly + 3);
+    }
+  }
+
+  // Counting line
+  const L = state.drawingLine && state.lineDraft ? state.lineDraft : state.line;
+  if (L) {
+    const flash = L.flash && performance.now() - L.flash < 300;
+    vctx.strokeStyle = flash ? "#ffffff" : "#4aa3ff"; vctx.lineWidth = lw * 2;
+    vctx.setLineDash([14, 8]);
+    vctx.beginPath(); vctx.moveTo(X(L.x1), L.y1); vctx.lineTo(X(L.x2), L.y2); vctx.stroke();
+    vctx.setLineDash([]);
+    if (state.line) {
+      const up = sum(tracker.lineUp), down = sum(tracker.lineDown);
+      const txt = `↑ ${up}   ↓ ${down}`;
+      const mx = (X(L.x1) + X(L.x2)) / 2, my = (L.y1 + L.y2) / 2;
+      const tw = vctx.measureText(txt).width + 16;
+      vctx.fillStyle = "rgba(74,163,255,.92)"; vctx.fillRect(mx - tw / 2, my - font - 14, tw, font + 10);
+      vctx.fillStyle = "#fff"; vctx.fillText(txt, mx - tw / 2 + 8, my - font - 9);
+    }
+  }
+
+  frames++;
+  const now = performance.now();
+  if (now - fpsT0 > 500) {
+    state.fps = (frames * 1000) / (now - fpsT0); frames = 0; fpsT0 = now;
+    $("pillFps").textContent = `${state.fps.toFixed(0)} FPS`;
+    $("pillInfer").textContent = state.detecting ? `${state.inferMs.toFixed(0)} ms / frame` : "paused";
+    updateVideoUi();
+  }
+}
+const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+
+/* ================= Stats UI ================= */
+function updateTable() {
+  const now = {};
+  for (const d of state.dets) now[d.cls] = (now[d.cls] || 0) + 1;
+  const classes = new Set([...Object.keys(now), ...Object.keys(tracker.unique), ...Object.keys(tracker.lineUp), ...Object.keys(tracker.lineDown)].map(Number));
+  const rows = [...classes].sort((a, b) => (tracker.unique[b] || 0) - (tracker.unique[a] || 0) || (now[b] || 0) - (now[a] || 0));
+  $("detTotal").textContent = `· ${state.dets.length} now · ${sum(tracker.unique)} unique`;
+  $("countsBody").innerHTML = rows.length ? rows.map((c) =>
+    `<tr><td><span class="swatch" style="background:${COLORS[c]}"></span>${COCO[c]}</td>` +
+    `<td>${now[c] || 0}</td><td>${tracker.unique[c] || 0}</td><td>${tracker.lineUp[c] || 0}</td><td>${tracker.lineDown[c] || 0}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="muted">No detections yet</td></tr>`;
+}
+
+function drawChart() {
+  const c = $("chart"), ctx = c.getContext("2d");
+  const dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = 120;
+  if (c.width !== W * dpr) { c.width = W * dpr; c.height = H * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const data = state.history;
+  const max = Math.max(5, ...data);
+  ctx.strokeStyle = "#263247"; ctx.lineWidth = 1; ctx.fillStyle = "#8a97ab"; ctx.font = "11px Segoe UI";
+  for (let i = 0; i <= 2; i++) {
+    const y = 8 + ((H - 24) * i) / 2;
+    ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillText(String(Math.round(max * (1 - i / 2))), 2, y + 4);
+  }
+  if (data.length < 2) return;
+  const x = (i) => 28 + ((W - 30) * i) / 149, y = (v) => 8 + (H - 24) * (1 - v / max);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "rgba(25,211,162,.45)"); grad.addColorStop(1, "rgba(25,211,162,0)");
+  ctx.beginPath(); ctx.moveTo(x(0), y(data[0]));
+  data.forEach((v, i) => ctx.lineTo(x(i), y(v)));
+  ctx.lineTo(x(data.length - 1), H - 16); ctx.lineTo(x(0), H - 16); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath(); data.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
+  ctx.strokeStyle = "#19d3a2"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#8a97ab"; ctx.fillText("objects per frame (last 150 detections)", 30, H - 2);
+}
+
+/* ================= Class chips ================= */
+function renderChips() {
+  const q = $("classSearch").value.trim().toLowerCase();
+  $("chips").innerHTML = COCO.map((n, i) => (q && !n.includes(q)) ? "" :
+    `<button class="chip ${state.enabled.has(i) ? "on" : ""}" data-cls="${i}" style="${state.enabled.has(i) ? `background:${COLORS[i]}` : ""}">${n}</button>`).join("");
+  $("classCount").textContent = `· ${state.enabled.size}/80`;
+}
+
+/* ================= Video UI ================= */
+const fmtTime = (t) => (isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}` : "0:00");
+function updateVideoUi() {
+  if (!state.source || state.source.kind !== "video") return;
+  const d = videoEl.duration || 0;
+  if (!seeking) $("seek").value = d ? Math.round((videoEl.currentTime / d) * 1000) : 0;
+  $("timeLabel").textContent = `${fmtTime(videoEl.currentTime)} / ${fmtTime(d)}`;
+}
+let seeking = false;
+
+/* ================= Helpers ================= */
+function setPill(id, text, cls) { const el = $(id); el.textContent = text; el.className = "pill" + (cls ? " " + cls : ""); }
+function showMsg(text, err) { const m = $("stageMsg"); m.textContent = text; m.className = "stage-msg" + (err ? " err" : ""); }
+function hideMsg() { $("stageMsg").className = "stage-msg hidden"; }
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const stamp = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+
+function canvasToSource(ev) {
+  const r = view.getBoundingClientRect();
+  let x = ((ev.clientX - r.left) / r.width) * view.width;
+  const y = ((ev.clientY - r.top) / r.height) * view.height;
+  if (state.source && state.source.mirror) x = view.width - x;
+  return [x, y];
+}
+
+/* ================= Wiring ================= */
+function wire() {
+  // Tabs
+  document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
+    document.querySelectorAll(".tab").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== b.dataset.tab));
+  }));
+
+  $("btnCctv").onclick = () => startCctv($("cctvUrl").value.trim());
+  $("btnCam").onclick = startWebcam;
+  $("camMirror").onchange = () => { if (state.source && state.source.kind === "webcam") state.source.mirror = $("camMirror").checked; };
+
+  const drop = $("drop"), fileInput = $("fileInput");
+  fileInput.onchange = () => fileInput.files[0] && startFile(fileInput.files[0]);
+  ["dragenter", "dragover"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (ev) => ev.dataTransfer.files[0] && startFile(ev.dataTransfer.files[0]));
+
+  // Detection settings
+  $("conf").oninput = (e) => { state.conf = parseFloat(e.target.value); $("confVal").textContent = state.conf.toFixed(2); };
+  $("rate").oninput = (e) => {
+    const v = parseInt(e.target.value, 10);
+    state.minInterval = v >= 31 ? 0 : 1000 / v;
+    $("rateVal").textContent = v >= 31 ? "Unlimited" : `${v} / s`;
+  };
+  $("backend").onchange = (e) => loadModel(e.target.value);
+
+  // Classes
+  renderChips();
+  $("chips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    const i = parseInt(c.dataset.cls, 10);
+    state.enabled.has(i) ? state.enabled.delete(i) : state.enabled.add(i);
+    renderChips();
+  });
+  document.querySelectorAll(".groups button").forEach((b) => b.addEventListener("click", () => {
+    const g = b.dataset.group;
+    state.enabled = g === "all" ? new Set(COCO.map((_, i) => i)) : g === "none" ? new Set()
+      : new Set(GROUPS[g].map((n) => COCO.indexOf(n)));
+    renderChips();
+  }));
+  $("classSearch").oninput = renderChips;
+
+  // Toolbar
+  $("btnPlay").onclick = () => { if (videoEl.paused) videoEl.play(); else videoEl.pause(); };
+  $("seek").addEventListener("input", () => { seeking = true; });
+  $("seek").addEventListener("change", (e) => {
+    if (videoEl.duration) videoEl.currentTime = (e.target.value / 1000) * videoEl.duration;
+    seeking = false; tracker.tracks = [];
+  });
+  $("speed").onchange = (e) => { videoEl.playbackRate = parseFloat(e.target.value); };
+  $("btnDetect").onclick = () => {
+    state.detecting = !state.detecting;
+    $("btnDetect").textContent = state.detecting ? "● Detecting" : "○ Paused";
+    $("btnDetect").classList.toggle("on", state.detecting);
+    if (!state.detecting) state.dets = [];
+  };
+  $("btnLine").onclick = () => {
+    state.drawingLine = true; state.lineDraft = null;
+    $("stage").classList.add("drawing"); $("lineHint").classList.remove("hidden");
+  };
+  $("btnClearLine").onclick = () => { state.line = null; tracker.lineUp = {}; tracker.lineDown = {}; updateTable(); };
+  view.addEventListener("pointerdown", (e) => {
+    if (!state.drawingLine) return;
+    const [x, y] = canvasToSource(e);
+    state.lineDraft = { x1: x, y1: y, x2: x, y2: y };
+    view.setPointerCapture(e.pointerId);
+  });
+  view.addEventListener("pointermove", (e) => {
+    if (!state.drawingLine || !state.lineDraft) return;
+    const [x, y] = canvasToSource(e);
+    state.lineDraft.x2 = x; state.lineDraft.y2 = y;
+  });
+  view.addEventListener("pointerup", () => {
+    if (!state.drawingLine || !state.lineDraft) return;
+    const L = state.lineDraft;
+    if (Math.hypot(L.x2 - L.x1, L.y2 - L.y1) > 10) {
+      state.line = L; tracker.lineUp = {}; tracker.lineDown = {};
+      tracker.tracks.forEach((t) => { t.side = null; t.sidePt = null; t.counted = false; });
+    }
+    state.drawingLine = false; state.lineDraft = null;
+    $("stage").classList.remove("drawing"); $("lineHint").classList.add("hidden");
+  });
+
+  $("btnSnap").onclick = () => view.width && view.toBlob((b) => download(b, `yolo26-snapshot-${stamp()}.png`), "image/png");
+  $("btnRec").onclick = () => {
+    if (state.recorder) { state.recorder.stop(); return; }
+    if (!view.width) return;
+    const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
+    const rec = new MediaRecorder(view.captureStream(30), { mimeType: mime, videoBitsPerSecond: 6e6 });
+    state.recChunks = [];
+    rec.ondataavailable = (e) => e.data.size && state.recChunks.push(e.data);
+    rec.onstop = () => {
+      download(new Blob(state.recChunks, { type: "video/webm" }), `yolo26-recording-${stamp()}.webm`);
+      state.recorder = null; $("btnRec").textContent = "⏺ Record"; $("btnRec").classList.remove("rec");
+    };
+    rec.start(1000);
+    state.recorder = rec; $("btnRec").textContent = "⏹ Stop"; $("btnRec").classList.add("rec");
+  };
+  $("btnReset").onclick = () => { tracker.reset(); state.history = []; state.heat = null; updateTable(); drawChart(); };
+  $("btnExport").onclick = () => {
+    const name = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [COCO[k], v]));
+    const now = {};
+    state.dets.forEach((d) => { now[COCO[d.cls]] = (now[COCO[d.cls]] || 0) + 1; });
+    const report = {
+      exported_at: new Date().toISOString(), model: "yolo26n", backend: state.backend,
+      source: state.source ? state.source.label : null, confidence: state.conf,
+      current: now, unique_tracked: name(tracker.unique),
+      line_crossings: state.line ? { up: name(tracker.lineUp), down: name(tracker.lineDown) } : null,
+      history: state.history,
+    };
+    download(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }), `yolo26-stats-${stamp()}.json`);
+  };
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.code === "Space" && state.source && state.source.kind === "video") { e.preventDefault(); $("btnPlay").click(); }
+    if (e.key === "s") $("btnSnap").click();
+    if (e.key === "d") $("btnDetect").click();
+  });
+  window.addEventListener("resize", drawChart);
+
+  // Presets
+  [{ name: "Keelung City CCTV (facd4662)", url: "https://cctv.klcg.gov.tw/facd4662" }].forEach((it) => {
+    const b = document.createElement("button");
+    b.textContent = it.name; b.onclick = () => { $("cctvUrl").value = it.url; };
+    $("cctvPresets").appendChild(b);
+  });
+
+  $("videoControls").style.visibility = "hidden";
+}
+
+wire();
+drawChart();
+loadModel(navigator.gpu ? "webgpu" : "wasm");
+requestAnimationFrame(render);
+inferLoop();
+
+</script>
+</body>
+</html>

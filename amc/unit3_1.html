@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit3_1 · Teachable Machine Recognizer</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<style>
+  :root { --bg: #0b0f17; --panel: #131a26; --panel2: #1a2333; --border: #263247; --text: #e6ebf3; --muted: #8a97ab; --accent: #19d3a2; --accent2: #4aa3ff; --danger: #ff5c7a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; border-bottom: 1px solid var(--border); background: #0f1622; }
+  header h1 { margin: 0; font-size: 19px; } header h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  header a { color: var(--accent2); text-decoration: none; font-size: 14px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .stage { position: relative; background: #05080d; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; }
+  canvas { max-width: 100%; max-height: 100%; display: block; }
+  .banner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); padding: 8px 22px; border-radius: 10px; font-size: 28px; font-weight: 800; color: #14181f; display: none; }
+  .msg { position: absolute; inset: auto 16px 16px 16px; text-align: center; background: rgba(10, 14, 22, .85); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .msg.err { border-color: var(--danger); color: #ffd0d9; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  button, .filebtn { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  button:hover, .filebtn:hover { border-color: var(--accent2); }
+  button.primary { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #04121b; border: 0; font-weight: 600; }
+  .filebtn input { display: none; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: .5px; color: var(--muted); }
+  .cls { display: grid; grid-template-columns: 70px 1fr 54px; gap: 8px; align-items: center; margin: 8px 0; font-size: 14px; }
+  .cls .bar { height: 14px; background: var(--panel2); border-radius: 99px; overflow: hidden; }
+  .cls .bar div { height: 100%; width: 0; transition: width .12s; }
+  .cls span:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .cls.top b { color: var(--text); }
+  input[type=text] { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; }
+  .muted { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>unit3_1 · Teachable Machine Recognizer <small>my own trained image model · TensorFlow.js</small></h1>
+  <a href="../unit.html?unit=3">← Back to Unit 3</a>
+</header>
+<main>
+  <section>
+    <div class="stage"><canvas id="out" width="1280" height="720"></canvas><div class="banner" id="banner"></div><div class="msg" id="msg">Loading the Teachable Machine model…</div></div>
+    <div class="controls">
+      <button class="primary" id="btnCam" disabled>🎥 Start camera</button>
+      <label class="filebtn">📁 Use a photo or video<input type="file" id="file" accept="image/*,video/*"></label>
+    </div>
+  </section>
+  <aside>
+    <div class="card"><h3>PREDICTIONS <span id="fps"></span></h3><div id="classes"></div></div>
+    <div class="card">
+      <h3>MODEL</h3>
+      <input type="text" id="modelUrl" value="https://teachablemachine.withgoogle.com/models/08183Hg18/">
+      <div class="controls" style="margin-top:8px"><button id="btnLoad">Load model</button></div>
+      <p class="muted" id="modelInfo"></p>
+      <p class="muted">The model sees only the <b>center square</b> of the image (white box). Keep the object inside it, with lighting similar to your training photos.</p>
+    </div>
+  </aside>
+</main>
+<video id="video" playsinline muted></video>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const video = $("video"), out = $("out"), octx = out.getContext("2d");
+video.style.display = "none";
+const COLORS = ["#4aa3ff", "#ffc83c", "#50dc78", "#b4b4b4", "#dc5adc", "#ff7850", "#50ffe6", "#aa96ff"];
+const crop = document.createElement("canvas"); crop.width = crop.height = 224;
+const cctx = crop.getContext("2d", { willReadFrequently: true });
+let model = null, labels = [], size = 224, smoothed = null, mirror = true, still = null, running = false, stream = null;
+
+function tmToStorage(url) {   // the share link redirects to Google storage; use it directly (CORS-enabled)
+  const m = url.match(/models\/([A-Za-z0-9_-]+)/);
+  return m ? `https://storage.googleapis.com/tm-model/${m[1]}/` : url.replace(/\/?$/, "/");
+}
+async function loadModel(link) {
+  msg("Loading the Teachable Machine model…");
+  $("btnCam").disabled = true;
+  const base = tmToStorage(link.trim());
+  const meta = await (await fetch(base + "metadata.json")).json();
+  const m = await tf.loadLayersModel(base + "model.json");
+  if (model) model.dispose();
+  model = m; labels = meta.labels; size = meta.imageSize || 224; smoothed = null;
+  crop.width = crop.height = size;
+  $("modelInfo").textContent = `“${meta.modelName || "model"}” · classes: ${labels.join(", ")}`;
+  $("classes").innerHTML = labels.map((l, i) => `<div class="cls" id="c${i}"><b style="color:${COLORS[i % 8]}">${l}</b><div class="bar"><div style="background:${COLORS[i % 8]}"></div></div><span>0%</span></div>`).join("");
+  $("btnCam").disabled = false;
+  msg("Ready. Start your camera or choose a photo / video.");
+}
+
+function predict(src, w, h) {
+  const s = Math.min(w, h), x0 = (w - s) / 2, y0 = (h - s) / 2;
+  cctx.save();
+  cctx.imageSmoothingEnabled = true; cctx.imageSmoothingQuality = "high";   // proper downscaling, close to OpenCV's INTER_AREA
+  if (mirror) { cctx.translate(size, 0); cctx.scale(-1, 1); }   // Teachable Machine trains on a mirrored webcam
+  cctx.drawImage(src, x0, y0, s, s, 0, 0, size, size);
+  cctx.restore();
+  return tf.tidy(() => {
+    const x = tf.browser.fromPixels(crop).toFloat().div(127).sub(1).expandDims(0);   // same normalisation as the TM library
+    return Array.from(model.predict(x).dataSync());
+  });
+}
+
+let fps = 0, lastT = performance.now();
+function loop() {
+  requestAnimationFrame(loop);
+  const src = still || video;
+  if (!model || (!still && video.readyState < 2)) return;
+  const w = still ? still.naturalWidth : video.videoWidth, h = still ? still.naturalHeight : video.videoHeight;
+  if (out.width !== w || out.height !== h) { out.width = w; out.height = h; }
+  octx.save(); if (mirror) { octx.translate(w, 0); octx.scale(-1, 1); } octx.drawImage(src, 0, 0, w, h); octx.restore();
+  const s = Math.min(w, h);
+  octx.strokeStyle = "rgba(255,255,255,.8)"; octx.lineWidth = Math.max(1, w / 640); octx.strokeRect((w - s) / 2, (h - s) / 2, s, s);
+
+  const probs = predict(src, w, h);
+  smoothed = smoothed ? smoothed.map((v, i) => 0.6 * v + 0.4 * probs[i]) : probs;
+  const top = smoothed.indexOf(Math.max(...smoothed));
+  const b = $("banner");
+  b.style.display = "block"; b.style.background = COLORS[top % 8];
+  b.textContent = `${labels[top]}  ${Math.round(smoothed[top] * 100)}%`;
+  smoothed.forEach((p, i) => {
+    const row = $("c" + i); row.classList.toggle("top", i === top);
+    row.querySelector(".bar div").style.width = `${p * 100}%`;
+    row.querySelector("span").textContent = `${(p * 100).toFixed(1)}%`;
+  });
+  const now = performance.now(); fps = 0.9 * fps + 0.1 * (1000 / Math.max(1, now - lastT)); lastT = now;
+  $("fps").textContent = `· ${fps.toFixed(0)} FPS`;
+}
+
+async function startCamera() {
+  try {
+    stopSource();
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream; mirror = true; await video.play(); begin();
+  } catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function startFile(f) {
+  stopSource(); mirror = false; smoothed = null;
+  const url = URL.createObjectURL(f);
+  if (f.type.startsWith("image/")) { still = new Image(); still.onload = begin; still.src = url; return; }
+  video.srcObject = null; video.src = url; video.loop = true; video.play().then(begin);
+}
+function stopSource() { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; still = null; }
+function begin() { hideMsg(); if (!running) { running = true; requestAnimationFrame(loop); } }
+function msg(t, err) { const el = $("msg"); el.textContent = t; el.className = "msg" + (err ? " err" : ""); el.style.display = ""; }
+function hideMsg() { $("msg").style.display = "none"; }
+
+$("btnCam").onclick = startCamera;
+$("file").onchange = (e) => e.target.files[0] && startFile(e.target.files[0]);
+$("btnLoad").onclick = () => loadModel($("modelUrl").value).catch((e) => msg("Could not load that model: " + e.message, true));
+loadModel($("modelUrl").value).catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>

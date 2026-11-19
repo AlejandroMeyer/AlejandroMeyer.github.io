@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit3_5 · Pforzheim AI Course Islands</title>
+<meta name="description" content="An interactive 3D map of the Pforzheim AI Course: sail between islands, one per course module, including Alejandro Meyer Island.">
+<style>
+  :root {
+    --ink: #0f2233;
+    --ink-soft: #4a6175;
+    --panel: rgba(255, 255, 255, 0.86);
+    --panel-border: rgba(15, 34, 51, 0.10);
+    --accent: #0e8f7e;
+    --accent-2: #f2a541;
+    --gold: #e0a526;
+    --chip: rgba(14, 143, 126, 0.10);
+    --shadow: 0 10px 30px rgba(10, 30, 50, 0.18);
+    --radius: 16px;
+  }
+  body.night {
+    --ink: #e8f0f7;
+    --ink-soft: #9fb3c6;
+    --panel: rgba(14, 24, 38, 0.86);
+    --panel-border: rgba(255, 255, 255, 0.10);
+    --chip: rgba(64, 214, 190, 0.14);
+    --accent: #40d6be;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd3ef; color: var(--ink);
+    font: 15px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  body.night { background: #0b1626; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  #scene { position: fixed; inset: 0; }
+  #scene canvas { display: block; }
+
+  /* ---------- Floating island labels ---------- */
+  .label { pointer-events: auto; cursor: pointer; padding: 5px 11px; border-radius: 999px; background: var(--panel);
+    border: 1px solid var(--panel-border); box-shadow: 0 4px 14px rgba(0, 0, 0, .15); font-size: 13px; font-weight: 600;
+    white-space: nowrap; transition: transform .2s, background .2s; backdrop-filter: blur(6px); user-select: none; }
+  .label .wk { font-weight: 500; color: var(--ink-soft); margin-right: 4px; font-size: 11.5px; }
+  .label.hover, .label.active { transform: scale(1.12); background: var(--accent); color: #fff; }
+  .label.hover .wk, .label.active .wk { color: rgba(255, 255, 255, .85); }
+  .label.visited::after { content: " ✓"; color: var(--accent); }
+  .label.hover.visited::after, .label.active.visited::after { color: #fff; }
+  .label .short { display: none; }
+  .label.owner { background: linear-gradient(135deg, #ffe08a, #f2a541); color: #3b2500; border-color: rgba(120, 70, 0, .25); }
+  .label.owner .wk { color: #6b4300; }
+
+  /* ---------- Header ---------- */
+  .hud-top { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; padding: 16px 18px; pointer-events: none; }
+  .title-card { pointer-events: auto; background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+    padding: 12px 18px; box-shadow: var(--shadow); backdrop-filter: blur(10px); max-width: 560px; }
+  .title-card h1 { margin: 0; font-size: 22px; letter-spacing: .2px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+  .title-card h1 .by { font-size: 14px; font-weight: 400; color: var(--ink-soft); font-style: italic; }
+  .title-card p { margin: 4px 0 0; color: var(--ink-soft); font-size: 13px; }
+  .title-card .owner-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 999px; background: linear-gradient(135deg, #ffe08a, #f2a541); color: #3b2500; border: 0; }
+  .progress { margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-soft); }
+  .progress .bar { flex: 1; height: 6px; background: rgba(127, 127, 127, .2); border-radius: 99px; overflow: hidden; min-width: 120px; }
+  .progress .bar div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .5s; }
+
+  .tools { pointer-events: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .tools button { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 8px 12px;
+    box-shadow: var(--shadow); backdrop-filter: blur(10px); font-size: 13.5px; font-weight: 600; }
+  .tools button:hover, .tools button.on { background: var(--accent); color: #fff; }
+  .tools .unitlink { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow);
+    backdrop-filter: blur(10px); font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: none; }
+  .tools .unitlink:hover { background: var(--accent); color: #fff; }
+
+  /* ---------- Island list ---------- */
+  .list { position: fixed; left: 18px; bottom: 18px; width: 290px; max-height: calc(100vh - 230px); display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+  .list header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-weight: 700; font-size: 13.5px; }
+  .list header button { background: none; border: 0; font-size: 12.5px; color: var(--ink-soft); }
+  .list ol { list-style: none; margin: 0; padding: 0 8px 8px; overflow-y: auto; }
+  .list li button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: 0;
+    padding: 7px 8px; border-radius: 10px; font-size: 13.5px; }
+  .list li button:hover, .list li button.active { background: var(--chip); }
+  .list li .ico { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
+  .list li .nm { flex: 1; min-width: 0; }
+  .list li .nm small { display: block; color: var(--ink-soft); font-size: 11.5px; }
+  .list li .chk { color: var(--accent); font-weight: 700; width: 14px; }
+  .list.collapsed ol { display: none; }
+
+  /* ---------- Detail panel ---------- */
+  .panel { position: fixed; top: 16px; right: 16px; bottom: 16px; width: 390px; background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 20px; box-shadow: var(--shadow); backdrop-filter: blur(14px); display: flex; flex-direction: column;
+    transform: translateX(calc(100% + 30px)); transition: transform .45s cubic-bezier(.2, .8, .2, 1); z-index: 5; }
+  .panel.open { transform: none; }
+  .panel .hero { padding: 20px 22px 14px; border-bottom: 1px solid var(--panel-border); position: relative; }
+  .panel .close { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--panel-border); background: transparent; font-size: 16px; }
+  .panel .emoji { font-size: 34px; line-height: 1; }
+  .panel h2 { margin: 8px 40px 4px 0; font-size: 21px; line-height: 1.25; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--chip); color: var(--accent); }
+  .badge.lvl { background: rgba(242, 165, 65, .16); color: #b36b00; }
+  body.night .badge.lvl { color: #ffc46b; }
+  .panel .body { padding: 16px 22px; overflow-y: auto; flex: 1; }
+  .panel .body h3 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink-soft); margin: 18px 0 8px; }
+  .panel .body h3:first-child { margin-top: 0; }
+  .panel .body p { margin: 0 0 6px; }
+  .panel .body ul { margin: 0; padding-left: 18px; }
+  .panel .body li { margin: 3px 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--chip); }
+  .try { background: linear-gradient(135deg, rgba(14, 143, 126, .12), rgba(242, 165, 65, .12)); border-radius: 12px; padding: 12px 14px; }
+  .projects { display: grid; gap: 8px; }
+  .project { border: 1px solid var(--panel-border); border-radius: 12px; padding: 9px 12px; }
+  .project b { display: block; font-size: 13.5px; }
+  .project span { font-size: 12.5px; color: var(--ink-soft); }
+  .panel footer { display: flex; gap: 8px; padding: 14px 22px 18px; border-top: 1px solid var(--panel-border); }
+  .panel footer button { flex: 1; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--panel-border); background: transparent; font-weight: 600; font-size: 13.5px; }
+  .panel footer button.primary { background: var(--accent); color: #fff; border: 0; }
+  .panel footer button.primary.done { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
+  .hint { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 999px; padding: 7px 16px; font-size: 12.5px; color: var(--ink-soft); box-shadow: var(--shadow); backdrop-filter: blur(10px);
+    transition: opacity .6s; pointer-events: none; white-space: nowrap; }
+  .credit { position: fixed; right: 18px; bottom: 18px; font-size: 11.5px; color: var(--ink-soft); background: var(--panel);
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--panel-border); }
+  .panel.open ~ .credit { opacity: 0; }
+
+  .loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    background: linear-gradient(#bfe6f8, #7cc4e8); z-index: 20; transition: opacity .8s; font-weight: 600; color: #0f2233; }
+  .loading .wave { font-size: 42px; animation: bob 1.4s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-8px) rotate(-6deg); } }
+  .loading.gone { opacity: 0; pointer-events: none; }
+  .fallback { max-width: 520px; text-align: center; font-weight: 400; padding: 0 20px; }
+
+  .help { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5, 15, 25, .45); z-index: 10; padding: 16px; }
+  .help.open { display: flex; }
+  .help > div { background: var(--panel); border-radius: 20px; padding: 22px 26px; max-width: 440px; box-shadow: var(--shadow); backdrop-filter: blur(14px); }
+  .help h2 { margin: 0 0 10px; font-size: 18px; }
+  .help kbd { background: var(--chip); border-radius: 6px; padding: 1px 7px; font: 600 12px ui-monospace, monospace; }
+  .help ul { padding-left: 18px; margin: 0 0 14px; }
+  .help li { margin: 5px 0; }
+  .help button { padding: 8px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; font-weight: 600; }
+
+  @media (max-width: 760px) {
+    .hud-top { flex-direction: column; padding: 12px; }
+    .title-card { padding: 10px 14px; max-width: none; width: 100%; }
+    .title-card h1 { font-size: 18px; }
+    .title-card p { display: none; }
+    .tools { justify-content: flex-start; }
+    .tools button { padding: 6px 10px; font-size: 12.5px; }
+    .list { left: 12px; right: 12px; bottom: 12px; width: auto; max-height: 38vh; }
+    .list:not(.collapsed) ~ .hint { opacity: 0; }
+    .panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 55vh; border-radius: 20px 20px 0 0; transform: translateY(105%); }
+    .panel .hero { padding: 14px 18px 10px; }
+    .panel .emoji { display: none; }
+    .panel h2 { margin-top: 0; font-size: 18px; }
+    .panel footer { padding: 10px 14px 12px; }
+    /* While an island is open, shrink the header to the title so the island stays visible */
+    body.panel-open .title-card .owner-tag, body.panel-open .title-card .progress, body.panel-open .tools,
+    body.panel-open .list { display: none; }
+    .hint { display: none; }
+    .credit { display: none; }
+    /* compact island labels on small screens */
+    .label { font-size: 11.5px; padding: 3px 8px; }
+    .label .full, .label .wk { display: none; }
+    .label .short { display: inline; }
+  }
+  @media (prefers-reduced-motion: reduce) { .panel, .label, .progress .bar div { transition: none; } .loading .wave { animation: none; } }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="scene" aria-hidden="true"></div>
+
+<div class="loading" id="loading"><div class="wave">⛵</div><div id="loadingText">Setting sail for the AI islands…</div></div>
+
+<div class="hud-top">
+  <div class="title-card">
+    <h1>Pforzheim AI Course Islands <span class="by">by Prof Luarn</span></h1>
+    <p>Sail the learning route: each island is one module of the course. Click an island to explore it.</p>
+    <span class="owner-tag" title="This version of the map was built by Alejandro Meyer">🏝️ Includes Alejandro Meyer Island · my project</span>
+    <div class="progress"><span id="progressText">0 / 9 islands explored</span><div class="bar"><div id="progressBar"></div></div></div>
+  </div>
+  <div class="tools">
+    <a href="../unit.html?unit=3" class="unitlink" title="Back to Unit 3">← Back to Unit 3</a>
+    <button id="btnTour" title="Guided tour through all islands (T)">▶ Tour</button>
+    <button id="btnNight" title="Toggle day / night (N)">☾ Night</button>
+    <button id="btnHome" title="Back to the overview (H)">⌂ Overview</button>
+    <button id="btnHelp" title="Controls">?</button>
+  </div>
+</div>
+
+<nav class="list" id="list" aria-label="Islands">
+  <header><span>🧭 Learning route</span><button id="btnList" aria-expanded="true">Hide</button></header>
+  <ol id="listItems"></ol>
+</nav>
+
+<aside class="panel" id="panel" aria-live="polite">
+  <div class="hero">
+    <button class="close" id="btnClose" aria-label="Close">✕</button>
+    <div class="emoji" id="pEmoji"></div>
+    <h2 id="pTitle"></h2>
+    <div class="badges" id="pBadges"></div>
+  </div>
+  <div class="body" id="pBody"></div>
+  <footer>
+    <button id="btnPrev">← Prev</button>
+    <button id="btnVisit" class="primary">Mark as explored</button>
+    <button id="btnNext">Next →</button>
+  </footer>
+</aside>
+
+<div class="hint" id="hint">Drag to rotate · Scroll / pinch to zoom · Click an island</div>
+<div class="credit">Alejandro Meyer Island · built by Alejandro Meyer</div>
+
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div>
+    <h2 id="helpTitle">How to explore</h2>
+    <ul>
+      <li><b>Drag</b> to rotate, <b>scroll / pinch</b> to zoom, <b>right-drag</b> to pan</li>
+      <li><b>Click</b> an island or its label to visit it</li>
+      <li><kbd>←</kbd> <kbd>→</kbd> previous / next island, <kbd>Esc</kbd> close</li>
+      <li><kbd>T</kbd> guided tour, <kbd>N</kbd> day / night, <kbd>H</kbd> overview</li>
+      <li>Mark islands as explored; your progress is remembered on this device</li>
+    </ul>
+    <button id="btnHelpClose">Got it</button>
+  </div>
+</div>
+
+<script type="module">
+/* =====================================================================
+   Pforzheim AI Course Islands - single-file Three.js scene
+   ===================================================================== */
+const loadingText = document.getElementById("loadingText");
+let THREE, OrbitControls, CSS2DRenderer, CSS2DObject;
+try {
+  THREE = await import("three");
+  ({ OrbitControls } = await import("three/addons/controls/OrbitControls.js"));
+  ({ CSS2DRenderer, CSS2DObject } = await import("three/addons/renderers/CSS2DRenderer.js"));
+} catch (e) {
+  loadingText.innerHTML = '<div class="fallback">Could not load the 3D engine (Three.js) from the CDN. Check your internet connection and reload. You can still browse the islands in the list.</div>';
+}
+
+/* ---------------------------- Course data ---------------------------- */
+const ISLANDS = [
+  { id: "foundations", name: "AI Foundations Island", short: "Foundations", emoji: "🗼", color: "#3aa7a3", week: "Weeks 1–2", level: "Beginner",
+    pos: [-50, 26], r: 7, h: 3.0, landmark: "lighthouse",
+    summary: "Your first landfall. What AI is (and isn't), where it came from, and the vocabulary you need for the rest of the journey.",
+    goals: ["Explain AI, machine learning and deep learning and how they relate", "Recognise everyday AI systems in business, design and engineering", "Tell realistic capabilities apart from hype"],
+    topics: ["History of AI", "Narrow vs. general AI", "ML vs. DL", "AI in industry"],
+    tools: ["Google Teachable Machine", "ChatGPT / Gemini"],
+    activity: "Find three AI-powered products you used this week. For each one, guess what data it learned from." },
+  { id: "data", name: "Data Harbour", short: "Data", emoji: "🗄️", color: "#4c8edb", week: "Weeks 3–4", level: "Beginner",
+    pos: [-27, 41], r: 6.5, h: 2.6, landmark: "data",
+    summary: "Every model is only as good as its data. Learn how data is collected, cleaned, labelled and explored, and how bias sneaks in.",
+    goals: ["Describe the data lifecycle from collection to labelling", "Clean and explore a small dataset", "Spot sampling bias and data-quality problems"],
+    topics: ["Structured vs. unstructured data", "Labelling", "Data cleaning", "Bias in datasets"],
+    tools: ["Excel / Google Sheets", "Python + pandas", "Kaggle datasets"],
+    activity: "Take a 50-row dataset and list every quality problem you can find before training anything." },
+  { id: "ml", name: "Machine Learning Isle", short: "Machine Learning", emoji: "🌳", color: "#5bb35e", week: "Weeks 5–6", level: "Beginner → Intermediate",
+    pos: [-8, 21], r: 7, h: 2.8, landmark: "decisionTree",
+    summary: "Teach computers from examples: classification, regression and clustering, plus how to tell whether a model is actually good.",
+    goals: ["Choose between supervised and unsupervised learning", "Train and evaluate a simple classifier", "Read accuracy, precision, recall and a confusion matrix"],
+    topics: ["Supervised learning", "Decision trees", "Clustering", "Train / test split", "Overfitting"],
+    tools: ["scikit-learn", "Orange (no-code)", "Google Colab"],
+    activity: "Train a decision tree on a student-friendly dataset and explain one of its decisions in plain language." },
+  { id: "dl", name: "Neural Network Reef", short: "Neural Nets", emoji: "🧠", color: "#8a6fd6", week: "Weeks 7–8", level: "Intermediate",
+    pos: [14, 37], r: 6.8, h: 2.7, landmark: "neural",
+    summary: "Layers of artificial neurons that learn features by themselves, the engine behind modern vision, speech and language AI.",
+    goals: ["Explain neurons, layers, weights and training by backpropagation", "Understand CNNs for images at a conceptual level", "Use transfer learning instead of training from scratch"],
+    topics: ["Perceptron", "Backpropagation", "CNNs", "Transfer learning"],
+    tools: ["TensorFlow Playground", "Keras", "PyTorch (intro)"],
+    activity: "In TensorFlow Playground, find the smallest network that separates the spiral dataset." },
+  { id: "genai", name: "Generative AI Cove", short: "GenAI", emoji: "✨", color: "#d65fb6", week: "Weeks 9–10", level: "Beginner → Intermediate",
+    pos: [35, 17], r: 7.2, h: 2.9, landmark: "crystal",
+    summary: "Large language models and image generators: how they work, how to prompt them well, and where they fail.",
+    goals: ["Explain tokens, context windows and next-token prediction", "Write structured prompts with roles, examples and constraints", "Evaluate outputs for accuracy and hallucinations"],
+    topics: ["LLMs", "Prompt engineering", "Diffusion models", "RAG basics", "AI agents"],
+    tools: ["Gemini (Google AI Studio)", "ChatGPT", "Midjourney / Firefly"],
+    activity: "Write one prompt three ways (zero-shot, few-shot, with a role) and compare the answers." },
+  { id: "vision", name: "Computer Vision Point", short: "Vision", emoji: "👁️", color: "#e07b39", week: "Week 11", level: "Intermediate",
+    pos: [45, -8], r: 6.6, h: 2.7, landmark: "eye",
+    summary: "Teaching machines to see: detecting objects, tracking hands and bodies, and segmenting people, often live in the browser.",
+    goals: ["Distinguish classification, detection and segmentation", "Run a pretrained detector (YOLO) and a pose / hand tracker (MediaPipe)", "Judge accuracy, speed and privacy trade-offs"],
+    topics: ["Object detection", "Pose & hand tracking", "Segmentation", "Edge / browser AI"],
+    tools: ["Ultralytics YOLO", "Google MediaPipe", "OpenCV"],
+    activity: "Point a webcam demo at your desk and list what it gets wrong, and why." },
+  { id: "ethics", name: "Ethics & Law Atoll", short: "Ethics & Law", emoji: "⚖️", color: "#c9a227", week: "Week 12", level: "All levels",
+    pos: [23, -27], r: 6.8, h: 2.5, landmark: "temple",
+    summary: "Responsible AI: fairness, transparency, privacy and the European rules that now govern AI products.",
+    goals: ["Summarise the EU AI Act's risk categories", "Apply GDPR basics to AI projects", "Run a simple fairness and impact check"],
+    topics: ["EU AI Act", "GDPR", "Fairness & bias", "Explainability", "Copyright & GenAI"],
+    tools: ["AI Act risk checklist", "Model cards"],
+    activity: "Classify five AI products by EU AI Act risk level and defend your choices in two sentences each." },
+  { id: "business", name: "Business & Design Bay", short: "Business & Design", emoji: "💡", color: "#e8554e", week: "Week 13", level: "All levels",
+    pos: [-5, -19], r: 7, h: 2.6, landmark: "city",
+    summary: "From idea to product: finding good AI use cases, designing human-centred AI experiences and estimating value and cost.",
+    goals: ["Identify and prioritise AI use cases in a company", "Design an AI feature people can trust", "Estimate value, cost and risk with a simple canvas"],
+    topics: ["Use-case canvas", "Human-centred AI", "Prototyping", "ROI & costs"],
+    tools: ["AI use-case canvas", "Figma", "No-code AI tools"],
+    activity: "Pick a local Pforzheim business and sketch one AI feature that would genuinely help its customers." },
+  { id: "alejandro", name: "Alejandro Meyer Island", short: "Alejandro Meyer", emoji: "🏝️", color: "#f2a541", week: "Student showcase", level: "My project", owner: true,
+    pos: [-33, -31], r: 8.4, h: 3.0, landmark: "home",
+    summary: "My own island: a showcase of the AI projects I built during the course, from MediaPipe body tracking to YOLO in the browser and a Gemini chat.",
+    goals: ["Show how the course topics turn into working, hands-on projects", "Run real models live: on the webcam, in the browser, and through an API", "Keep API keys and personal data safe while building"],
+    topics: ["MediaPipe", "YOLO26", "ONNX Runtime Web", "TensorFlow.js", "Gemini API"],
+    tools: ["Python + OpenCV", "Flask", "JavaScript", "Three.js"],
+    projects: [
+      ["AI Fitness Coach", "Counts arm-curl reps for each arm separately with MediaPipe Pose"],
+      ["Two-Hand Gesture Recognizer", "Live gestures and color-coded hand landmarks"],
+      ["Virtual Background", "Selfie segmentation with photo, color and blur backgrounds"],
+      ["Face Keypoint Shapes", "Face detection with random geometric shapes on each keypoint"],
+      ["Hand-Controlled Particles", "4,000 particles steered by hand openness and distance"],
+      ["Teachable Machine Recognizer", "My own model: Phone, Cup, Watch and Empty"],
+      ["YOLO26 Detection Studio", "Live CCTV and YouTube detection, tracking and line counting in the browser"],
+      ["Neural Style Studio", "15 neural art styles plus custom style images"],
+      ["Gemini Chat", "A streaming chat on Gemini 3.5 Flash-Lite with the API key kept server-side"],
+    ],
+    activity: "Pick one project above and explain to a classmate which course island it builds on." },
+];
+const byId = Object.fromEntries(ISLANDS.map((d, i) => [d.id, { ...d, index: i }]));
+
+/* ---------------------------- Progress (per device) ---------------------------- */
+const STORE = "pforzheim-ai-islands-visited";
+let visited = new Set();
+try { visited = new Set(JSON.parse(localStorage.getItem(STORE) || "[]")); } catch (e) { visited = new Set(); }
+const saveVisited = () => { try { localStorage.setItem(STORE, JSON.stringify([...visited])); } catch (e) { /* storage unavailable */ } };
+
+/* ---------------------------- UI: list + panel ---------------------------- */
+const $ = (id) => document.getElementById(id);
+const panel = $("panel");
+let current = -1;
+
+function renderList() {
+  $("listItems").innerHTML = ISLANDS.map((d, i) => `
+    <li><button data-i="${i}" class="${i === current ? "active" : ""}">
+      <span class="ico" style="background:${d.color}26">${d.emoji}</span>
+      <span class="nm">${d.name}<small>${d.week} · ${d.level}</small></span>
+      <span class="chk">${visited.has(d.id) ? "✓" : ""}</span>
+    </button></li>`).join("");
+  $("progressText").textContent = `${visited.size} / ${ISLANDS.length} islands explored`;
+  $("progressBar").style.width = `${(visited.size / ISLANDS.length) * 100}%`;
+}
+$("listItems").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-i]");
+  if (b) { stopTour(); openIsland(+b.dataset.i); }
+});
+
+function renderPanel(i) {
+  const d = ISLANDS[i];
+  $("pEmoji").textContent = d.emoji;
+  $("pTitle").textContent = d.name;
+  $("pBadges").innerHTML = `<span class="badge">${d.week}</span><span class="badge lvl">${d.level}</span>` +
+    (d.owner ? `<span class="badge" style="background:#ffe08a;color:#6b4300">by Alejandro Meyer</span>` : "");
+  const list = (a) => `<ul>${a.map((x) => `<li>${x}</li>`).join("")}</ul>`;
+  $("pBody").innerHTML = `
+    <h3>About this island</h3><p>${d.summary}</p>
+    ${d.projects ? `<h3>Projects on this island</h3><div class="projects">${d.projects.map(([t, s]) => `<div class="project"><b>${t}</b><span>${s}</span></div>`).join("")}</div>` : ""}
+    <h3>${d.owner ? "What it shows" : "You will learn to"}</h3>${list(d.goals)}
+    <h3>Topics</h3><div class="chips">${d.topics.map((t) => `<span class="chip">${t}</span>`).join("")}</div>
+    <h3>Tools</h3><div class="chips">${d.tools.map((t) => `<span class="chip">${t}</span>`).join("")}</div>
+    <h3>Try it</h3><div class="try">${d.activity}</div>`;
+  $("pBody").scrollTop = 0;
+  const done = visited.has(d.id);
+  $("btnVisit").textContent = done ? "✓ Explored" : "Mark as explored";
+  $("btnVisit").classList.toggle("done", done);
+}
+
+function openIsland(i, { fly = true } = {}) {
+  current = (i + ISLANDS.length) % ISLANDS.length;
+  renderPanel(current);
+  panel.classList.add("open");
+  document.body.classList.add("panel-open");
+  renderList();
+  if (scene3d) { scene3d.setActive(current); if (fly) scene3d.focus(current); }
+}
+function closePanel() {
+  panel.classList.remove("open");
+  document.body.classList.remove("panel-open");
+  current = -1;
+  renderList();
+  if (scene3d) scene3d.setActive(-1);
+}
+$("btnClose").onclick = () => { stopTour(); closePanel(); };
+$("btnPrev").onclick = () => { stopTour(); openIsland(current - 1); };
+$("btnNext").onclick = () => { stopTour(); openIsland(current + 1); };
+$("btnVisit").onclick = () => {
+  const d = ISLANDS[current];
+  visited.has(d.id) ? visited.delete(d.id) : visited.add(d.id);
+  saveVisited(); renderPanel(current); renderList();
+  if (scene3d) scene3d.refreshLabels();
+};
+$("btnList").onclick = () => {
+  const l = $("list"); l.classList.toggle("collapsed");
+  $("btnList").textContent = l.classList.contains("collapsed") ? "Show" : "Hide";
+  $("btnList").setAttribute("aria-expanded", String(!l.classList.contains("collapsed")));
+};
+$("btnHelp").onclick = () => $("help").classList.add("open");
+$("btnHelpClose").onclick = () => $("help").classList.remove("open");
+$("help").onclick = (e) => { if (e.target.id === "help") $("help").classList.remove("open"); };
+
+/* Tour */
+let tourTimer = null;
+function startTour() {
+  $("btnTour").classList.add("on"); $("btnTour").textContent = "■ Stop tour";
+  let i = current < 0 ? 0 : current;
+  openIsland(i);
+  tourTimer = setInterval(() => { i = (i + 1) % ISLANDS.length; openIsland(i); }, 7000);
+}
+function stopTour() {
+  if (!tourTimer) return;
+  clearInterval(tourTimer); tourTimer = null;
+  $("btnTour").classList.remove("on"); $("btnTour").textContent = "▶ Tour";
+}
+$("btnTour").onclick = () => (tourTimer ? stopTour() : startTour());
+
+/* Mobile: start with the list collapsed so the islands are visible */
+if (matchMedia("(max-width: 760px)").matches) { $("list").classList.add("collapsed"); $("btnList").textContent = "Show"; }
+renderList();
+
+/* =====================================================================
+   3D scene
+   ===================================================================== */
+let scene3d = null;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function buildScene() {
+  const container = $("scene");
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  container.appendChild(renderer.domElement);
+
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(innerWidth, innerHeight);
+  Object.assign(labelRenderer.domElement.style, { position: "absolute", top: "0", left: "0", pointerEvents: "none" });
+  container.appendChild(labelRenderer.domElement);
+
+  const scene = new THREE.Scene();
+  const DAY = { sky: new THREE.Color("#9fd3ef"), fog: new THREE.Color("#b9e1f4"), water: new THREE.Color("#2b8fc4"), sun: 2.4, hemi: 1.1 };
+  const NIGHT = { sky: new THREE.Color("#0b1626"), fog: new THREE.Color("#0f1f33"), water: new THREE.Color("#123a5c"), sun: 0.35, hemi: 0.35 };
+  scene.background = DAY.sky.clone();
+  scene.fog = new THREE.Fog(DAY.fog.clone(), 200, 480);
+
+  const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 900);
+  // Overview camera: pull back on narrow / portrait screens and aim further away so the islands sit below the header
+  const homeView = () => {
+    const a = innerWidth / innerHeight;
+    if (a < 0.8) {   // portrait phone: look along the archipelago's long (x) axis so it fits the tall screen
+      const target = new THREE.Vector3(-4, 0, 5);
+      const dist = THREE.MathUtils.clamp(150 / a, 190, 290);
+      return { pos: target.clone().addScaledVector(new THREE.Vector3(1, 0.95, 0.12).normalize(), dist), target: target.clone().add(new THREE.Vector3(-14, 0, 0)) };
+    }
+    const k = a < 1.35 ? 1.3 : 1;
+    return { pos: new THREE.Vector3(0, 78 * k, 104 * k), target: new THREE.Vector3(-2, 0, a < 1.35 ? -14 : 2) };
+  };
+  const HOME = homeView();
+  camera.position.copy(HOME.pos);
+  camera.lookAt(HOME.target);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.copy(HOME.target);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 14;
+  controls.maxDistance = 300;
+  controls.maxPolarAngle = Math.PI * 0.44;
+
+  /* Lights */
+  const hemi = new THREE.HemisphereLight(0xdff3ff, 0x3c5a3a, DAY.hemi);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff1d6, DAY.sun);
+  sun.position.set(60, 90, 40);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80, near: 10, far: 260 });
+  sun.shadow.bias = -0.0005;
+  scene.add(sun);
+
+  /* Helpers */
+  const mats = new Map();
+  const mat = (color, extra = {}) => {
+    const key = color + JSON.stringify(extra);
+    if (!mats.has(key)) mats.set(key, new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.85, metalness: 0.0, ...extra }));
+    return mats.get(key);
+  };
+  const mesh = (geo, material, { cast = true, receive = true } = {}) => {
+    const m = new THREE.Mesh(geo, material); m.castShadow = cast; m.receiveShadow = receive; return m;
+  };
+  const rngFor = (seed) => { let s = 0; for (const c of seed) s = (s * 31 + c.charCodeAt(0)) >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
+  const beam = (a, b, radius, material) => {
+    const dir = new THREE.Vector3().subVectors(b, a), len = dir.length();
+    const m = mesh(new THREE.CylinderGeometry(radius, radius, len, 6), material);
+    m.position.copy(a).addScaledVector(dir, 0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    return m;
+  };
+
+  /* Ocean */
+  const OCEAN_SEG = 110;
+  const oceanGeo = new THREE.PlaneGeometry(900, 900, OCEAN_SEG, OCEAN_SEG);
+  oceanGeo.rotateX(-Math.PI / 2);
+  const oceanMat = new THREE.MeshStandardMaterial({ color: DAY.water.clone(), flatShading: true, roughness: 0.35, metalness: 0.1, transparent: true, opacity: 0.94 });
+  const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+  ocean.receiveShadow = true;
+  scene.add(ocean);
+  const oceanBase = oceanGeo.attributes.position.array.slice();
+  const waveH = (x, z, t) => Math.sin(x * 0.09 + t * 0.9) * 0.35 + Math.cos(z * 0.11 + t * 0.7) * 0.3 + Math.sin((x + z) * 0.05 + t * 0.5) * 0.25;
+
+  /* Trees and rocks */
+  function pine(scale = 1) {
+    const g = new THREE.Group();
+    g.add(mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.7, 5), mat("#7a5233")));
+    g.children[0].position.y = 0.35;
+    for (let k = 0; k < 3; k++) {
+      const c = mesh(new THREE.ConeGeometry(0.75 - k * 0.18, 1.0, 7), mat(k % 2 ? "#3f8f4a" : "#2f7a3f"));
+      c.position.y = 0.95 + k * 0.5; g.add(c);
+    }
+    g.scale.setScalar(scale); return g;
+  }
+  function palm(scale = 1, lean = 0.25) {
+    const g = new THREE.Group();
+    const pts = [];
+    for (let k = 0; k <= 5; k++) pts.push(new THREE.Vector3(Math.sin(k / 5 * 1.2) * lean * 2, k * 0.55, 0));
+    for (let k = 0; k < 5; k++) g.add(beam(pts[k], pts[k + 1], 0.14 - k * 0.012, mat("#8a6a45")));
+    const top = pts[5];
+    for (let k = 0; k < 6; k++) {
+      const leaf = mesh(new THREE.ConeGeometry(0.28, 1.9, 4), mat(k % 2 ? "#3c9a4b" : "#2f8a40"));
+      leaf.position.copy(top);
+      leaf.rotation.set(Math.PI / 2 - 0.35, (k / 6) * Math.PI * 2, 0, "YXZ");
+      leaf.translateY(0.85);
+      g.add(leaf);
+    }
+    const coco = mesh(new THREE.SphereGeometry(0.16, 6, 5), mat("#5a3d22"));
+    coco.position.copy(top).add(new THREE.Vector3(0.12, -0.15, 0.1)); g.add(coco);
+    g.scale.setScalar(scale); return g;
+  }
+  function rock(scale = 1) { const r = mesh(new THREE.DodecahedronGeometry(0.6, 0), mat("#8d949b")); r.scale.set(scale, scale * 0.7, scale); return r; }
+
+  /* Landmarks (each returns a Group placed at the hill top; `anim` callbacks run every frame) */
+  const anim = [];
+  const glows = [];       // emissive materials that light up at night
+  const LANDMARKS = {
+    lighthouse() {
+      const g = new THREE.Group();
+      for (let k = 0; k < 4; k++) {
+        const seg = mesh(new THREE.CylinderGeometry(0.85 - k * 0.12 - 0.12, 0.85 - k * 0.12, 1.2, 12), mat(k % 2 ? "#d64541" : "#f4f1ea"));
+        seg.position.y = 0.6 + k * 1.2; g.add(seg);
+      }
+      const deck = mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.15, 12), mat("#33414d")); deck.position.y = 4.9; g.add(deck);
+      const lampMat = new THREE.MeshStandardMaterial({ color: "#fff3b0", emissive: "#ffd34d", emissiveIntensity: 0.4, flatShading: true });
+      glows.push(lampMat);
+      const lamp = mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.7, 10), lampMat); lamp.position.y = 5.3; g.add(lamp);
+      const roof = mesh(new THREE.ConeGeometry(0.62, 0.8, 10), mat("#d64541")); roof.position.y = 6.05; g.add(roof);
+      const beamMat = new THREE.MeshBasicMaterial({ color: "#fff2a8", transparent: true, opacity: 0, depthWrite: false });
+      const light = new THREE.Mesh(new THREE.ConeGeometry(2.4, 16, 16, 1, true), beamMat);
+      light.rotation.z = Math.PI / 2; light.position.set(8, 0, 0);
+      const pivot = new THREE.Group(); pivot.position.y = 5.3; pivot.add(light); g.add(pivot);
+      anim.push((t, night) => { pivot.rotation.y = t * 0.8; beamMat.opacity += ((night ? 0.22 : 0) - beamMat.opacity) * 0.05; });
+      return g;
+    },
+    data() {
+      const g = new THREE.Group();
+      const colors = ["#4c8edb", "#62b6e8", "#3a6fb3", "#7cc6f0"];
+      [1.2, 2.4, 1.8, 3.0].forEach((hgt, k) => {
+        const b = mesh(new THREE.BoxGeometry(0.7, hgt, 0.7), mat(colors[k])); b.position.set(-1.35 + k * 0.9, hgt / 2, -0.4); g.add(b);
+      });
+      for (let k = 0; k < 3; k++) {     // database "disk stack"
+        const d = mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.42, 18), mat(k % 2 ? "#dfe8f2" : "#b9c9dc"));
+        d.position.set(1.0, 0.25 + k * 0.48, 1.2); g.add(d);
+      }
+      const cubes = [];
+      for (let k = 0; k < 5; k++) {
+        const c = mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), mat("#ffd166", { emissive: "#ffb000", emissiveIntensity: 0.25 }));
+        g.add(c); cubes.push(c);
+      }
+      anim.push((t) => cubes.forEach((c, k) => { const a = t * 0.8 + k * 1.25; c.position.set(Math.cos(a) * 2.2, 2.6 + Math.sin(t * 2 + k) * 0.25, Math.sin(a) * 2.2); c.rotation.y = a; }));
+      return g;
+    },
+    decisionTree() {
+      const g = new THREE.Group();
+      const wood = mat("#7a5233");
+      const nodeMat = (c) => mat(c, { emissive: c, emissiveIntensity: 0.15 });
+      const root = new THREE.Vector3(0, 3.6, 0);
+      g.add(beam(new THREE.Vector3(0, 0, 0), root, 0.22, wood));
+      const lvl1 = [new THREE.Vector3(-1.4, 4.6, 0), new THREE.Vector3(1.4, 4.6, 0)];
+      const lvl2 = [new THREE.Vector3(-2.1, 5.6, 0.3), new THREE.Vector3(-0.7, 5.6, -0.3), new THREE.Vector3(0.7, 5.6, 0.3), new THREE.Vector3(2.1, 5.6, -0.3)];
+      lvl1.forEach((p) => g.add(beam(root, p, 0.12, wood)));
+      lvl2.forEach((p, k) => g.add(beam(lvl1[k < 2 ? 0 : 1], p, 0.08, wood)));
+      const n = (p, r, c) => { const s = mesh(new THREE.IcosahedronGeometry(r, 0), nodeMat(c)); s.position.copy(p); g.add(s); };
+      n(root, 0.42, "#ffd166");
+      lvl1.forEach((p) => n(p, 0.34, "#7bd389"));
+      lvl2.forEach((p, k) => n(p, 0.3, k % 2 ? "#ef6f6c" : "#5bb35e"));
+      return g;
+    },
+    neural() {
+      const g = new THREE.Group();
+      const layers = [3, 4, 2], spacing = 1.6, pts = [];
+      layers.forEach((n, li) => {
+        const row = [];
+        for (let k = 0; k < n; k++) {
+          const p = new THREE.Vector3((li - 1) * spacing * 1.2, 2.2 + (k - (n - 1) / 2) * 1.0, 0);
+          const nodeMat = new THREE.MeshStandardMaterial({ color: "#b9a6ff", emissive: "#7b5cff", emissiveIntensity: 0.3, flatShading: true });
+          glows.push(nodeMat);
+          const s = mesh(new THREE.SphereGeometry(0.3, 10, 8), nodeMat); s.position.copy(p); g.add(s); row.push(p);
+        }
+        pts.push(row);
+        const pole = mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.2 + (n - 1) / 2 + 0.6, 5), mat("#5a5f6b"));
+        pole.position.set((li - 1) * spacing * 1.2, (2.2 + (n - 1) / 2 + 0.6) / 2 - 0.4, -0.35); g.add(pole);
+      });
+      const seg = [];
+      for (let li = 0; li < pts.length - 1; li++) for (const a of pts[li]) for (const b of pts[li + 1]) seg.push(a, b);
+      const lineMat = new THREE.LineBasicMaterial({ color: "#d9ccff", transparent: true, opacity: 0.8 });
+      g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(seg), lineMat));
+      anim.push((t) => { lineMat.opacity = 0.45 + 0.4 * Math.abs(Math.sin(t * 1.6)); });
+      return g;
+    },
+    crystal() {
+      const g = new THREE.Group();
+      const cMat = new THREE.MeshStandardMaterial({ color: "#ffb8f0", emissive: "#d63fb3", emissiveIntensity: 0.45, flatShading: true, roughness: 0.2, metalness: 0.2, transparent: true, opacity: 0.92 });
+      glows.push(cMat);
+      const big = mesh(new THREE.OctahedronGeometry(1.25, 0), cMat); big.scale.y = 1.8; big.position.y = 3.2; g.add(big);
+      [[-1.2, 0.9, 0.5], [1.1, 0.7, -0.6], [0.3, 0.6, 1.2]].forEach(([x, s, z]) => {
+        const c = mesh(new THREE.OctahedronGeometry(0.6 * s, 0), cMat); c.scale.y = 1.9; c.position.set(x, 0.9, z); g.add(c);
+      });
+      const sparkles = [];
+      for (let k = 0; k < 6; k++) {
+        const sp = mesh(new THREE.TetrahedronGeometry(0.16, 0), mat("#fff6a8", { emissive: "#ffe066", emissiveIntensity: 0.8 }), { cast: false });
+        g.add(sp); sparkles.push(sp);
+      }
+      anim.push((t) => {
+        big.rotation.y = t * 0.6; big.position.y = 3.2 + Math.sin(t * 1.5) * 0.25;
+        sparkles.forEach((s, k) => { const a = t * 1.2 + k; s.position.set(Math.cos(a) * 2, 3 + Math.sin(a * 2) * 0.8, Math.sin(a) * 2); s.rotation.x = a * 2; });
+      });
+      return g;
+    },
+    eye(camera) {
+      const g = new THREE.Group();
+      g.add(beam(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 2.6, 0), 0.35, mat("#5c6670")));
+      const head = new THREE.Group(); head.position.y = 3.6; g.add(head);
+      head.add(mesh(new THREE.SphereGeometry(1.15, 18, 14), mat("#f6f4ef", { roughness: 0.4 })));
+      const iris = mesh(new THREE.CircleGeometry(0.62, 20), mat("#e07b39"), { cast: false }); iris.position.z = 1.14; head.add(iris);
+      const pupil = mesh(new THREE.CircleGeometry(0.3, 16), mat("#111"), { cast: false }); pupil.position.z = 1.16; head.add(pupil);
+      const ring = mesh(new THREE.TorusGeometry(1.35, 0.1, 6, 24), mat("#e07b39")); head.add(ring);
+      const tmp = new THREE.Vector3();
+      anim.push(() => { head.getWorldPosition(tmp); head.lookAt(camera.position); });   // the eye follows you
+      return g;
+    },
+    temple() {
+      const g = new THREE.Group();
+      const stone = mat("#efe6d2"), dark = mat("#d6c7a6");
+      const s1 = mesh(new THREE.BoxGeometry(4.2, 0.3, 3.0), dark); s1.position.y = 0.15; g.add(s1);
+      const s2 = mesh(new THREE.BoxGeometry(3.8, 0.3, 2.6), stone); s2.position.y = 0.45; g.add(s2);
+      for (const x of [-1.5, -0.5, 0.5, 1.5]) for (const z of [-0.95, 0.95]) {
+        const c = mesh(new THREE.CylinderGeometry(0.18, 0.2, 2.2, 8), stone); c.position.set(x, 1.7, z); g.add(c);
+      }
+      const ent = mesh(new THREE.BoxGeometry(4.0, 0.35, 2.8), dark); ent.position.y = 2.95; g.add(ent);
+      const roof = mesh(new THREE.CylinderGeometry(0.01, 1.7, 4.1, 3, 1), stone);
+      roof.rotation.set(0, 0, Math.PI / 2); roof.rotation.order = "ZYX"; roof.scale.set(1, 1, 0.45);
+      roof.rotation.z = Math.PI / 2; roof.rotation.x = Math.PI / 2; roof.position.y = 3.55; g.add(roof);
+      // scales of justice on top
+      const sc = new THREE.Group(); sc.position.y = 4.2; g.add(sc);
+      sc.add(beam(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.1, 0), 0.05, mat("#c9a227")));
+      const arm = new THREE.Group(); arm.position.y = 1.1; sc.add(arm);
+      arm.add(beam(new THREE.Vector3(-0.9, 0, 0), new THREE.Vector3(0.9, 0, 0), 0.04, mat("#c9a227")));
+      for (const x of [-0.9, 0.9]) {
+        const pan = mesh(new THREE.CylinderGeometry(0.35, 0.2, 0.08, 10), mat("#e3c14d")); pan.position.set(x, -0.5, 0); arm.add(pan);
+      }
+      anim.push((t) => { arm.rotation.z = Math.sin(t * 0.9) * 0.12; });
+      return g;
+    },
+    city() {
+      const g = new THREE.Group();
+      const cols = ["#f4f1ea", "#e8554e", "#ffd166", "#9fd3ef", "#cfd8dc"];
+      [[-1.6, -0.6, 1.0, 2.2], [-0.4, -1.2, 0.9, 3.2], [0.9, -0.4, 1.1, 1.6], [-1.0, 0.9, 0.8, 1.3], [1.5, 1.0, 0.8, 2.4]].forEach(([x, z, w, hgt], k) => {
+        const b = mesh(new THREE.BoxGeometry(w, hgt, w), mat(cols[k])); b.position.set(x, hgt / 2, z); g.add(b);
+        const winMat = new THREE.MeshStandardMaterial({ color: "#2b3a4a", emissive: "#ffcf6b", emissiveIntensity: 0.05, flatShading: true });
+        glows.push(winMat);
+        for (let r = 0; r < Math.floor(hgt / 0.6); r++) {
+          const wdw = mesh(new THREE.BoxGeometry(w * 0.6, 0.18, 0.02), winMat, { cast: false }); wdw.position.set(x, 0.45 + r * 0.6, z + w / 2 + 0.01); g.add(wdw);
+        }
+      });
+      g.add(beam(new THREE.Vector3(0.3, 0, 0.4), new THREE.Vector3(0.3, 4.4, 0.4), 0.06, mat("#5c6670")));
+      const bulbMat = new THREE.MeshStandardMaterial({ color: "#fff6c2", emissive: "#ffd34d", emissiveIntensity: 0.6, flatShading: true });
+      glows.push(bulbMat);
+      const bulb = mesh(new THREE.SphereGeometry(0.55, 12, 10), bulbMat); bulb.position.set(0.3, 4.9, 0.4); g.add(bulb);
+      anim.push((t) => { bulb.scale.setScalar(1 + Math.sin(t * 2.4) * 0.06); });
+      return g;
+    },
+    home() {
+      const g = new THREE.Group();
+      // cozy house
+      const house = new THREE.Group(); house.position.set(-1.2, 0, 0.6); house.rotation.y = 0.5; g.add(house);
+      const walls = mesh(new THREE.BoxGeometry(2.6, 1.7, 2.0), mat("#fff4e0")); walls.position.y = 0.85; house.add(walls);
+      const roof = mesh(new THREE.ConeGeometry(2.05, 1.3, 4), mat("#c8553d")); roof.position.y = 2.35; roof.rotation.y = Math.PI / 4; roof.scale.z = 0.85; house.add(roof);
+      const door = mesh(new THREE.BoxGeometry(0.5, 0.9, 0.05), mat("#7a5233")); door.position.set(0, 0.45, 1.01); house.add(door);
+      const winMat = new THREE.MeshStandardMaterial({ color: "#9fd3ef", emissive: "#ffc861", emissiveIntensity: 0.05, flatShading: true });
+      glows.push(winMat);
+      for (const x of [-0.8, 0.8]) { const w = mesh(new THREE.BoxGeometry(0.45, 0.45, 0.05), winMat); w.position.set(x, 1.0, 1.01); house.add(w); }
+      const chimney = mesh(new THREE.BoxGeometry(0.35, 0.8, 0.35), mat("#8d949b")); chimney.position.set(0.7, 2.6, -0.3); house.add(chimney);
+      // laptop on a table in front (it's a coding island)
+      const table = mesh(new THREE.BoxGeometry(0.9, 0.06, 0.6), mat("#a0764a")); table.position.set(0.9, 0.55, 2.0); g.add(table);
+      for (const [x, z] of [[0.55, 1.8], [1.25, 1.8], [0.55, 2.2], [1.25, 2.2]]) g.add(beam(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, 0.55, z), 0.03, mat("#7a5233")));
+      const lapBase = mesh(new THREE.BoxGeometry(0.5, 0.03, 0.34), mat("#3b4250")); lapBase.position.set(0.9, 0.6, 2.0); g.add(lapBase);
+      const scrMat = new THREE.MeshStandardMaterial({ color: "#1b2b3a", emissive: "#40d6be", emissiveIntensity: 0.6, flatShading: true });
+      glows.push(scrMat);
+      const scr = mesh(new THREE.BoxGeometry(0.5, 0.32, 0.02), scrMat); scr.position.set(0.9, 0.78, 1.84); scr.rotation.x = -0.25; g.add(scr);
+
+      // flag with the island's name
+      const pole = beam(new THREE.Vector3(2.2, 0, -0.6), new THREE.Vector3(2.2, 7.4, -0.6), 0.09, mat("#d9d9d9")); g.add(pole);
+      const cv = document.createElement("canvas"); cv.width = 512; cv.height = 256;
+      const ctx = cv.getContext("2d");
+      const grd = ctx.createLinearGradient(0, 0, 512, 256); grd.addColorStop(0, "#ffe08a"); grd.addColorStop(1, "#f2a541");
+      ctx.fillStyle = grd; ctx.fillRect(0, 0, 512, 256);
+      ctx.fillStyle = "#3b2500"; ctx.textAlign = "center";
+      ctx.font = "bold 58px Segoe UI, Arial, sans-serif"; ctx.fillText("ALEJANDRO", 256, 98);
+      ctx.fillText("MEYER", 256, 160);
+      ctx.font = "600 30px Segoe UI, Arial, sans-serif"; ctx.fillText("ISLAND", 256, 210);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+      const FW = 4.0;   // flag width
+      const flagGeo = new THREE.PlaneGeometry(FW, FW / 2, 24, 8);
+      const flag = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({ map: tex, side: THREE.FrontSide, roughness: 0.8 }));
+      flag.castShadow = true;
+      flag.position.set(2.2 + FW / 2, 7.4 - FW / 4 - 0.1, -0.6); g.add(flag);
+      // back side gets a mirrored copy of the texture so the name reads correctly from both sides
+      const texBack = tex.clone(); texBack.wrapS = THREE.RepeatWrapping; texBack.repeat.x = -1; texBack.offset.x = 1; texBack.needsUpdate = true;
+      const flagBack = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({ map: texBack, side: THREE.BackSide, roughness: 0.8 }));
+      flagBack.position.copy(flag.position); g.add(flagBack);
+      const flagBase = flagGeo.attributes.position.array.slice();
+      anim.push((t) => {
+        const p = flagGeo.attributes.position.array;
+        for (let k = 0; k < p.length; k += 3) {
+          const x = flagBase[k] + FW / 2;                   // 0 at the pole, FW at the free end
+          p[k + 2] = Math.sin(x * 1.8 - t * 4) * 0.09 * x;
+          p[k + 1] = flagBase[k + 1] - x * 0.03;
+        }
+        flagGeo.attributes.position.needsUpdate = true;
+        flagGeo.computeVertexNormals();
+      });
+      return g;
+    },
+  };
+
+  /* Islands */
+  const islands = [];
+  const pickables = [];
+  const shallowMats = [];   // unlit "shallow water" rings, dimmed at night
+  ISLANDS.forEach((d, i) => {
+    const rng = rngFor(d.id);
+    const g = new THREE.Group();
+    g.position.set(d.pos[0], 0, d.pos[1]);
+    const r = d.r, hillR = r * 0.8;
+
+    const shallowMat = new THREE.MeshBasicMaterial({ color: "#7fd6e0", transparent: true, opacity: 0.35, depthWrite: false });
+    shallowMats.push(shallowMat);
+    const shallow = new THREE.Mesh(new THREE.CircleGeometry(r * 1.45, 36), shallowMat);
+    shallow.rotation.x = -Math.PI / 2; shallow.position.y = 0.05; g.add(shallow);
+
+    const sandGeo = new THREE.CylinderGeometry(r, r * 1.12, 1.6, 30, 1);
+    const sp = sandGeo.attributes.position;
+    for (let k = 0; k < sp.count; k++) { const f = 1 + (rng() - 0.5) * 0.08; sp.setX(k, sp.getX(k) * f); sp.setZ(k, sp.getZ(k) * f); }
+    sandGeo.computeVertexNormals();
+    const sand = mesh(sandGeo, mat(d.owner ? "#f3dfae" : "#e9d7a6")); sand.position.y = -0.35; g.add(sand);
+
+    const hillGeo = new THREE.SphereGeometry(hillR, 22, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+    const hp = hillGeo.attributes.position;
+    for (let k = 0; k < hp.count; k++) {
+      const y = hp.getY(k);
+      if (y > 0.01) { const f = 1 + (rng() - 0.5) * 0.16; hp.setX(k, hp.getX(k) * f); hp.setZ(k, hp.getZ(k) * f); hp.setY(k, y * (1 + (rng() - 0.5) * 0.1)); }
+    }
+    hillGeo.computeVertexNormals();
+    const hill = mesh(hillGeo, mat(d.owner ? "#6cc06a" : "#5aaa5c")); hill.scale.y = d.h / hillR; hill.position.y = 0.42; g.add(hill);
+    const tint = mesh(new THREE.CylinderGeometry(hillR * 0.98, hillR * 1.02, 0.12, 26), mat(d.color)); tint.position.y = 0.46; g.add(tint);   // coloured "coast" ring identifies the island
+    const topY = 0.42 + d.h;
+    const hillY = (dist) => 0.42 + d.h * Math.sqrt(Math.max(0, 1 - (dist / hillR) ** 2));
+
+    const lm = LANDMARKS[d.landmark](camera);
+    lm.position.y = topY - 0.25;
+    g.add(lm);
+
+    const nTrees = d.owner ? 5 : 6 + Math.floor(rng() * 4);
+    for (let k = 0; k < nTrees; k++) {
+      const a = rng() * Math.PI * 2, dist = hillR * (0.5 + rng() * 0.38);
+      const tree = d.owner || d.landmark === "crystal" ? palm(0.75 + rng() * 0.3, 0.15 + rng() * 0.2) : pine(0.7 + rng() * 0.45);
+      tree.position.set(Math.cos(a) * dist, hillY(dist) - 0.1, Math.sin(a) * dist);
+      tree.rotation.y = rng() * 6.28;
+      g.add(tree);
+    }
+    for (let k = 0; k < 5; k++) {
+      const a = rng() * Math.PI * 2, dist = r * (0.88 + rng() * 0.2);
+      const rk = rock(0.5 + rng() * 0.7); rk.position.set(Math.cos(a) * dist, 0.25, Math.sin(a) * dist); rk.rotation.y = rng() * 6; g.add(rk);
+    }
+    if (d.owner) {   // a little dock + boat-house feel for my island
+      const dock = mesh(new THREE.BoxGeometry(1.2, 0.15, 4.2), mat("#a0764a")); dock.position.set(r * 0.75, 0.55, r * 0.55); dock.rotation.y = -0.8; g.add(dock);
+    }
+
+    // Floating label
+    const el = document.createElement("div");
+    el.className = "label" + (d.owner ? " owner" : "");
+    el.innerHTML = `<span class="wk">${d.owner ? "★" : d.week.replace("Weeks ", "W").replace("Week ", "W")}</span>${d.emoji} <span class="full">${d.name}</span><span class="short">${d.short}</span>`;
+    el.addEventListener("click", (e) => { e.stopPropagation(); stopTour(); openIsland(i); });
+    el.addEventListener("pointerenter", () => setHover(i));
+    el.addEventListener("pointerleave", () => setHover(-1));
+    const label = new CSS2DObject(el);
+    label.position.set(0, topY + 6.4, 0);
+    g.add(label);
+
+    g.traverse((o) => { if (o.isMesh) { o.userData.island = i; pickables.push(o); } });
+    scene.add(g);
+    islands.push({ group: g, label: el, topY, scale: 1, targetScale: 1 });
+  });
+
+  /* Learning route (dashed) + sailing boat */
+  const routePts = ISLANDS.map((d) => new THREE.Vector3(d.pos[0], 0.5, d.pos[1]));
+  const curve = new THREE.CatmullRomCurve3(routePts, false, "catmullrom", 0.5);
+  const routeGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(400));
+  const route = new THREE.Line(routeGeo, new THREE.LineDashedMaterial({ color: "#ffffff", dashSize: 1.6, gapSize: 1.2, transparent: true, opacity: 0.75 }));
+  route.computeLineDistances();
+  scene.add(route);
+
+  const boat = new THREE.Group();
+  const hull = mesh(new THREE.CylinderGeometry(0.9, 0.4, 3.2, 4, 1), mat("#8a4b2d")); hull.rotation.set(Math.PI / 2, Math.PI / 4, 0); hull.scale.set(1, 1, 0.55); hull.position.y = 0.3; boat.add(hull);
+  boat.add(beam(new THREE.Vector3(0, 0.4, 0), new THREE.Vector3(0, 3.4, 0), 0.06, mat("#d9d9d9")));
+  const sailGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.7, 0.1), new THREE.Vector3(0, 3.3, 0.1), new THREE.Vector3(0, 0.8, -1.7)]);
+  sailGeo.setIndex([0, 1, 2]); sailGeo.computeVertexNormals();
+  const sail = mesh(sailGeo, new THREE.MeshStandardMaterial({ color: "#fdfaf2", side: THREE.DoubleSide, flatShading: true }));
+  boat.add(sail);
+  const pennant = mesh(new THREE.ConeGeometry(0.15, 0.6, 3), mat("#0e8f7e")); pennant.rotation.z = Math.PI / 2; pennant.position.set(0, 3.45, -0.3); boat.add(pennant);
+  scene.add(boat);
+
+  /* Clouds, birds, stars */
+  const clouds = [];
+  const cloudMat = new THREE.MeshStandardMaterial({ color: "#ffffff", flatShading: true, roughness: 1, transparent: true, opacity: 0.95 });
+  for (let k = 0; k < 9; k++) {
+    const c = new THREE.Group();
+    for (let j = 0; j < 4; j++) { const s = mesh(new THREE.IcosahedronGeometry(2 + Math.random() * 1.6, 0), cloudMat, { receive: false }); s.position.set(j * 2.3 - 3.5, Math.random() * 1.2, Math.random() * 1.6); c.add(s); }
+    c.position.set(-120 + Math.random() * 240, 30 + Math.random() * 12, -110 + Math.random() * 200);
+    c.userData.speed = 1.2 + Math.random() * 1.6;
+    scene.add(c); clouds.push(c);
+  }
+  const birds = [];
+  for (let k = 0; k < 5; k++) {
+    const b = new THREE.Group();
+    for (const s of [-1, 1]) { const w = mesh(new THREE.BoxGeometry(1.1, 0.05, 0.35), mat("#2f3640"), { receive: false }); w.position.x = s * 0.55; w.userData.side = s; b.add(w); }
+    b.userData = { r: 30 + k * 9, speed: 0.12 + k * 0.02, phase: k * 1.3, y: 20 + k * 2 };
+    scene.add(b); birds.push(b);
+  }
+  const starGeo = new THREE.BufferGeometry();
+  const starPos = new Float32Array(900 * 3);
+  for (let k = 0; k < 900; k++) {
+    const th = Math.random() * Math.PI * 2, ph = Math.random() * Math.PI * 0.45;
+    starPos.set([Math.cos(th) * Math.sin(ph) * 400, Math.cos(ph) * 400, Math.sin(th) * Math.sin(ph) * 400], k * 3);
+  }
+  starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({ color: "#ffffff", size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+  scene.add(new THREE.Points(starGeo, starMat));
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(8, 20, 16), new THREE.MeshBasicMaterial({ color: "#fff5d6", fog: false, transparent: true, opacity: 0 }));
+  moon.position.set(-150, 120, -220); scene.add(moon);
+
+  /* Interaction: hover + click */
+  const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
+  let hovered = -1, active = -1, downAt = null;
+  function setHover(i) {
+    if (hovered === i) return;
+    hovered = i;
+    islands.forEach((isl, k) => { isl.label.classList.toggle("hover", k === i); isl.targetScale = k === i || k === active ? 1.06 : 1; });
+    renderer.domElement.style.cursor = i >= 0 ? "pointer" : "";
+  }
+  function pick(e) {
+    const r = renderer.domElement.getBoundingClientRect();
+    pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects(pickables, false)[0];
+    return hit ? hit.object.userData.island : -1;
+  }
+  renderer.domElement.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") setHover(pick(e)); });
+  renderer.domElement.addEventListener("pointerdown", (e) => { downAt = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener("pointerup", (e) => {
+    if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;   // it was a drag, not a click
+    const i = pick(e);
+    if (i >= 0) { stopTour(); openIsland(i); }
+  });
+  controls.addEventListener("start", () => { flight = null; stopTour(); fadeHint(); });
+
+  /* Camera flights */
+  let flight = null;
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  function flyTo(pos, target, ms = 1600) {
+    if (reducedMotion) { camera.position.copy(pos); controls.target.copy(target); controls.update(); return; }
+    flight = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: target, start: performance.now(), ms };
+  }
+  function focus(i) {
+    const d = ISLANDS[i];
+    const c = new THREE.Vector3(d.pos[0], islands[i].topY * 0.6, d.pos[1]);
+    const out = new THREE.Vector3(d.pos[0], 0, d.pos[1]);
+    if (out.lengthSq() < 1) out.set(0, 0, 1);
+    out.normalize();
+    const side = new THREE.Vector3(-out.z, 0, out.x).multiplyScalar(6);
+    const panelOpenOnSide = innerWidth > 760;
+    const pos = c.clone().addScaledVector(out, 30).add(side).add(new THREE.Vector3(0, 17, 0));
+    const target = c.clone();
+    if (panelOpenOnSide) {   // shift the view so the island sits left of the side panel
+      const right = new THREE.Vector3().subVectors(target, pos).cross(new THREE.Vector3(0, 1, 0)).normalize();
+      target.addScaledVector(right, 5); pos.addScaledVector(right, 5);
+    } else {   // bottom sheet on phones: view from a bit further and higher, island in the upper third
+      pos.addScaledVector(out, 6).add(new THREE.Vector3(0, 8, 0));
+      target.y -= 9;
+    }
+    flyTo(pos, target);
+  }
+  function setActive(i) { active = i; islands.forEach((isl, k) => { isl.label.classList.toggle("active", k === i); isl.label.classList.toggle("visited", visited.has(ISLANDS[k].id)); isl.targetScale = k === i || k === hovered ? 1.06 : 1; }); }
+  function refreshLabels() { islands.forEach((isl, k) => isl.label.classList.toggle("visited", visited.has(ISLANDS[k].id))); }
+  refreshLabels();
+
+  /* Day / night */
+  let night = false, nightMix = 0;
+  function setNight(on) {
+    night = on;
+    document.body.classList.toggle("night", on);
+    $("btnNight").textContent = on ? "☀ Day" : "☾ Night";
+    $("btnNight").classList.toggle("on", on);
+  }
+  $("btnNight").onclick = () => setNight(!night);
+  $("btnHome").onclick = () => { stopTour(); closePanel(); const h = homeView(); flyTo(h.pos, h.target, 1800); };
+
+  /* Resize */
+  addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
+  });
+
+  /* Loop */
+  const clock = new THREE.Clock();
+  let frame = 0;
+  const tmpQ = new THREE.Vector3();
+  function tick() {
+    requestAnimationFrame(tick);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime * (reducedMotion ? 0.3 : 1);
+    frame++;
+
+    // ocean waves (normals every other frame)
+    const p = oceanGeo.attributes.position.array;
+    for (let k = 0; k < p.length; k += 3) p[k + 1] = waveH(oceanBase[k], oceanBase[k + 2], t);
+    oceanGeo.attributes.position.needsUpdate = true;
+    if (frame % 2 === 0) oceanGeo.computeVertexNormals();
+
+    // islands gently bob and grow on hover
+    islands.forEach((isl, k) => {
+      isl.scale += (isl.targetScale - isl.scale) * 0.12;
+      isl.group.scale.setScalar(isl.scale);
+      isl.group.position.y = Math.sin(t * 0.6 + k) * 0.08;
+    });
+
+    // boat sails the route back and forth
+    const u = (Math.sin(t * 0.035 - Math.PI / 2) + 1) / 2;
+    const dir = Math.cos(t * 0.035 - Math.PI / 2) >= 0 ? 1 : -1;   // sailing forward or back along the route
+    const pos = curve.getPointAt(u), ahead = curve.getPointAt(THREE.MathUtils.clamp(u + 0.003 * dir, 0, 1));
+    boat.position.set(pos.x, waveH(pos.x, pos.z, t) - 0.05, pos.z);
+    tmpQ.set(ahead.x, boat.position.y, ahead.z);
+    if (tmpQ.distanceToSquared(boat.position) > 1e-6) boat.lookAt(tmpQ);
+    boat.rotation.z += Math.sin(t * 1.5) * 0.05;
+
+    clouds.forEach((c) => { c.position.x += c.userData.speed * dt; if (c.position.x > 140) c.position.x = -140; });
+    birds.forEach((b) => {
+      const a = t * b.userData.speed + b.userData.phase;
+      b.position.set(Math.cos(a) * b.userData.r, b.userData.y + Math.sin(t * 2 + b.userData.phase) * 0.6, Math.sin(a) * b.userData.r);
+      b.rotation.y = -a;
+      b.children.forEach((w) => { w.rotation.z = w.userData.side * Math.sin(t * 9 + b.userData.phase) * 0.5; });
+    });
+
+    // day / night blend
+    nightMix += ((night ? 1 : 0) - nightMix) * Math.min(1, dt * 2.5);
+    scene.background.lerpColors(DAY.sky, NIGHT.sky, nightMix);
+    scene.fog.color.lerpColors(DAY.fog, NIGHT.fog, nightMix);
+    oceanMat.color.lerpColors(DAY.water, NIGHT.water, nightMix);
+    sun.intensity = THREE.MathUtils.lerp(DAY.sun, NIGHT.sun, nightMix);
+    hemi.intensity = THREE.MathUtils.lerp(DAY.hemi, NIGHT.hemi, nightMix);
+    starMat.opacity = nightMix; moon.material.opacity = nightMix;
+    cloudMat.opacity = 0.95 - nightMix * 0.6;
+    shallowMats.forEach((m) => { m.opacity = 0.35 * (1 - nightMix * 0.8); });
+    glows.forEach((m) => { m.emissiveIntensity = THREE.MathUtils.lerp(m.userData.base ??= m.emissiveIntensity, 1.6, nightMix); });
+
+    anim.forEach((f) => f(t, night));
+
+    if (flight) {
+      const k = Math.min(1, (performance.now() - flight.start) / flight.ms), e = ease(k);
+      camera.position.lerpVectors(flight.p0, flight.p1, e);
+      controls.target.lerpVectors(flight.t0, flight.t1, e);
+      if (k >= 1) flight = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+  }
+  tick();
+  return { focus, setActive, refreshLabels, flyTo, setHover };
+}
+
+function fadeHint() { const h = $("hint"); if (h) { h.style.opacity = "0"; setTimeout(() => h.remove(), 700); } }
+
+if (THREE) {
+  try {
+    scene3d = buildScene();
+    setTimeout(() => $("loading").classList.add("gone"), 350);   // timer (not rAF) so it also clears in background tabs
+  } catch (e) {
+    console.error(e);
+    loadingText.innerHTML = '<div class="fallback">Your browser could not start 3D graphics (WebGL). You can still explore every island from the list.</div>';
+    setTimeout(() => $("loading").classList.add("gone"), 2500);
+  }
+} else {
+  setTimeout(() => $("loading").classList.add("gone"), 2500);
+}
+setTimeout(fadeHint, 9000);
+
+/* Keyboard */
+addEventListener("keydown", (e) => {
+  if (e.target.closest("input, textarea")) return;
+  if (e.key === "Escape") { if ($("help").classList.contains("open")) $("help").classList.remove("open"); else { stopTour(); closePanel(); } }
+  else if (e.key === "ArrowRight") { stopTour(); openIsland(current < 0 ? 0 : current + 1); }
+  else if (e.key === "ArrowLeft") { stopTour(); openIsland(current < 0 ? ISLANDS.length - 1 : current - 1); }
+  else if (e.key.toLowerCase() === "t") $("btnTour").click();
+  else if (e.key.toLowerCase() === "n") $("btnNight").click();
+  else if (e.key.toLowerCase() === "h") $("btnHome").click();
+});
+</script>
+</body>
+</html>
