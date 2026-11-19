@@ -815,7 +815,7 @@
                     : '';
 
                 return `
-                    <div class="gallery-item" data-bs-toggle="modal" data-bs-target="#imageModal" onclick="showImage(${index})">
+                    <div class="gallery-item" onclick="showImage(${index})">
                         <img src="${image.src}" alt="Unit ${currentUnit} - Image ${index + 1}">
                         <div class="gallery-overlay">
                             <h5>${fileName}</h5>
@@ -835,6 +835,10 @@
 
             modalImage.src = image.src;
             imageDescription.textContent = image.description;
+
+            // Open the popup here (not via data-bs-toggle on the card), so clicking
+            // the demo link inside a card opens only the link, not an empty popup
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('imageModal')).show();
         }
 
         // Scroll animations
