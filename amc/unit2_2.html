@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit2_2 · Video Face Landmark Detection</title>
+<link rel="stylesheet" href="assets/css/vision.css">
+</head>
+<body>
+<header>
+  <h1>unit2_2 · Video Face Landmark Detection <small>MediaPipe Face Landmarker · live 468-point face mesh</small></h1>
+  <a href="../unit.html?unit=2">← Back to Unit 2</a>
+</header>
+<main>
+  <section>
+    <div class="stage" id="stage">
+      <canvas id="out" width="1280" height="720"></canvas>
+      <div class="hud" id="hud" style="display:none"></div>
+      <div class="msg" id="msg">Loading the face model…</div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="btnCam" disabled>🎥 Start camera</button>
+      <label class="filebtn">📁 Use a video file<input type="file" id="file" accept="video/*"></label>
+      <button id="btnPlay" disabled>⏸ Pause</button>
+      <button id="btnStop" disabled>⏹ Stop</button>
+      <button id="btnSnap" disabled>📸 Snapshot</button>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h3>DRAWING</h3>
+      <div class="field"><label>Style</label><select id="style"></select></div>
+      <div class="field"><label>Colors</label><select id="scheme"></select></div>
+      <div class="field"><label class="check"><input type="checkbox" id="black"> Draw on a black background</label></div>
+      <div class="field"><label>Line thickness <b id="thick-v"></b></label><input type="range" id="thick" min="1" max="3" step="0.5" value="1.5"></div>
+      <div class="field"><label>Dot size <b id="dot-v"></b></label><input type="range" id="dot" min="1" max="4" step="0.5" value="1.5"></div>
+      <div class="field"><label>Max faces <b id="faces-v"></b></label><input type="range" id="faces" min="1" max="5" step="1" value="2"></div>
+    </div>
+    <div class="card">
+      <h3>LIVE EXPRESSIONS <span id="count"></span></h3>
+      <div id="expr"><div class="empty">Start the camera or choose a video.</div></div>
+    </div>
+    <div class="card muted">
+      Smile, blink, open your mouth or raise your eyebrows and watch the bars move. Drop a video onto the viewer to analyse it.
+      <kbd>Space</kbd> pauses a video file, <kbd>Esc</kbd> stops. YouTube links need a server, so download the clip and use <b>Use a video file</b>.
+    </div>
+  </aside>
+</main>
+<video id="video" playsinline muted style="display:none"></video>
+
+<script type="module">
+import { $, msg, hideMsg, wireFileInputs, openCamera, closeCamera, downloadCanvas, slider, fpsMeter } from "./assets/js/common.js";
+import { createLandmarker, drawFaces, renderExpressions, STYLES, SCHEMES } from "./assets/js/facemesh.js";
+
+const canvas = $("out"), ctx = canvas.getContext("2d"), video = $("video");
+let landmarker = null, stream = null, active = false, mirror = false, result = null, lastFrameTime = -1, lastTs = -1, ms = 0, fpsValue = 0, panelTimer = 0;
+const fps = fpsMeter();
+
+for (const [k, v] of Object.entries(STYLES)) $("style").add(new Option(v, k));
+for (const [k, v] of Object.entries(SCHEMES)) $("scheme").add(new Option(v.label, k));
+const thick = slider("thick", (v) => v + " px", () => {});
+const dot = slider("dot", (v) => v + " px", () => {});
+let facesTimer;
+const faces = slider("faces", (v) => v, () => {
+  clearTimeout(facesTimer);
+  facesTimer = setTimeout(() => landmarker?.setOptions({ numFaces: faces() }), 120);
+});
+
+async function load() {
+  landmarker = await createLandmarker({ mode: "VIDEO", numFaces: faces() });
+  $("btnCam").disabled = false;
+  msg("Ready. Start your camera, or choose a video file.");
+}
+
+/* ---------- Sources ---------- */
+async function startCamera() {
+  stopSource();
+  try { stream = await openCamera(video); mirror = true; begin(); }
+  catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function startVideo(url) {
+  stopSource();
+  video.srcObject = null; video.src = url; video.loop = true; mirror = false;
+  video.play().then(begin).catch((e) => msg("This video could not be played: " + e.message, true));
+}
+function stopSource() {
+  closeCamera(stream); stream = null;
+  video.pause(); video.removeAttribute("src"); video.srcObject = null; video.load();
+  active = false; result = null; lastFrameTime = -1;
+  ["btnPlay", "btnStop", "btnSnap"].forEach((id) => ($(id).disabled = true));
+}
+function begin() {
+  hideMsg(); active = true;
+  $("btnStop").disabled = $("btnSnap").disabled = false;
+  $("btnPlay").disabled = !!stream; $("btnPlay").textContent = "⏸ Pause";
+}
+function stop() {
+  stopSource(); $("hud").style.display = "none"; $("count").textContent = "";
+  $("expr").innerHTML = '<div class="empty">Start the camera or choose a video.</div>';
+  msg("Stopped. Start the camera or choose a video whenever you like.");
+}
+function togglePlay() {
+  if (stream || !active) return;
+  if (video.paused) { video.play(); $("btnPlay").textContent = "⏸ Pause"; } else { video.pause(); $("btnPlay").textContent = "▶ Play"; }
+}
+
+/* ---------- Main loop ---------- */
+function loop() {
+  requestAnimationFrame(loop);
+  if (!active || video.readyState < 2) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (!w) return;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+
+  if (landmarker && (stream || video.currentTime !== lastFrameTime)) {
+    lastFrameTime = video.currentTime;
+    const ts = Math.max(performance.now(), lastTs + 1); lastTs = ts;
+    const t0 = performance.now();
+    result = landmarker.detectForVideo(video, ts);
+    ms = ms ? ms * 0.8 + (performance.now() - t0) * 0.2 : performance.now() - t0;
+    fpsValue = fps();
+    const now = performance.now();
+    if (now - panelTimer > 100) {
+      panelTimer = now;
+      const n = result.faceLandmarks.length;
+      $("count").textContent = `· ${n} face${n === 1 ? "" : "s"}`;
+      renderExpressions($("expr"), result);
+    }
+  }
+
+  if ($("black").checked) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h); }
+  else { ctx.save(); if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, w, h); ctx.restore(); }
+  if (result) drawFaces(ctx, result.faceLandmarks, { width: w, height: h, mirror, style: $("style").value, scheme: $("scheme").value, thickness: thick(), pointRadius: dot() });
+
+  $("hud").style.display = "";
+  $("hud").innerHTML = `<span><b>${result?.faceLandmarks.length || 0}</b> faces</span><span><b>${fpsValue.toFixed(0)}</b> fps</span><span><b>${ms.toFixed(0)}</b> ms / frame</span>` +
+    (stream ? "" : `<span><b>${video.currentTime.toFixed(1)}</b> / ${(video.duration || 0).toFixed(1)} s</span>`);
+}
+
+/* ---------- Wiring ---------- */
+wireFileInputs({ input: $("file"), stage: $("stage"), accept: ["video/"], onFile: (f) => startVideo(URL.createObjectURL(f)) });
+$("btnCam").onclick = startCamera;
+$("btnPlay").onclick = togglePlay;
+$("btnStop").onclick = stop;
+$("btnSnap").onclick = () => downloadCanvas(canvas, `face_mesh_${Date.now()}.png`);
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === " ") { e.preventDefault(); togglePlay(); }
+  if (e.key === "Escape" && active) stop();
+});
+requestAnimationFrame(loop);
+load().catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>

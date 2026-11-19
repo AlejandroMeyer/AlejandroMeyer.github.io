@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit1_5 · Video Object Recognition</title>
+<link rel="stylesheet" href="assets/css/vision.css">
+</head>
+<body>
+<header>
+  <h1>unit1_5 · Video Object Recognition <small>MediaPipe Object Detector · webcam or video file</small></h1>
+  <a href="../unit.html?unit=1">← Back to Unit 1</a>
+</header>
+<main>
+  <section>
+    <div class="stage" id="stage">
+      <canvas id="out" width="1280" height="720"></canvas>
+      <div class="hud" id="hud" style="display:none"></div>
+      <div class="msg" id="msg">Loading the detection model…</div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="btnCam" disabled>🎥 Start camera</button>
+      <label class="filebtn">📁 Use a video file<input type="file" id="file" accept="video/*"></label>
+      <button id="btnPlay" disabled>⏸ Pause</button>
+      <button id="btnStop" disabled>⏹ Stop</button>
+      <button id="btnSnap" disabled>📸 Snapshot</button>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h3>SETTINGS</h3>
+      <div class="field"><label>Model</label>
+        <select id="model"><option value="lite0">EfficientDet-Lite0 (fast)</option><option value="lite2">EfficientDet-Lite2 (more accurate)</option></select></div>
+      <div class="field"><label>Confidence threshold <b id="thr-v"></b></label><input type="range" id="thr" min="0.1" max="0.9" step="0.05" value="0.4"></div>
+      <div class="field"><label>Max detections <b id="max-v"></b></label><input type="range" id="max" min="1" max="25" step="1" value="10"></div>
+    </div>
+    <div class="card">
+      <h3>IN THIS FRAME <span id="count"></span></h3>
+      <div class="list" id="now"><div class="empty">Start the camera or choose a video.</div></div>
+    </div>
+    <div class="card">
+      <h3>SEEN SO FAR <span class="muted">(most at once)</span></h3>
+      <div class="list" id="seen"><div class="empty">–</div></div>
+    </div>
+    <div class="card muted">
+      Drop a video onto the viewer to analyse it. <kbd>Space</kbd> pauses a video file, <kbd>Esc</kbd> stops.
+      YouTube links need a server, so download the clip and use <b>Use a video file</b> instead.
+    </div>
+  </aside>
+</main>
+<video id="video" playsinline muted style="display:none"></video>
+
+<script type="module">
+import { $, msg, hideMsg, wireFileInputs, openCamera, closeCamera, downloadCanvas, slider, fpsMeter } from "./assets/js/common.js";
+import { createDetector, simplify, drawBoxes, colorFor } from "./assets/js/objdet.js";
+
+const canvas = $("out"), ctx = canvas.getContext("2d"), video = $("video");
+let detector = null, stream = null, active = false, mirror = false, objects = [], lastFrameTime = -1, lastTs = -1, ms = 0, seen = {}, loading = false;
+const fps = fpsMeter();
+let fpsValue = 0;
+
+const thr = slider("thr", (v) => Math.round(v * 100) + "%", applyOptions);
+const max = slider("max", (v) => v, applyOptions);
+
+async function loadModel() {
+  loading = true; ["btnCam", "model"].forEach((id) => ($(id).disabled = true));
+  if (!active) msg("Loading the detection model…");
+  const old = detector; detector = null;
+  detector = await createDetector({ model: $("model").value, mode: "VIDEO", scoreThreshold: thr(), maxResults: max() });
+  old?.close(); loading = false; lastFrameTime = -1;
+  ["btnCam", "model"].forEach((id) => ($(id).disabled = false));
+  if (!active) msg("Ready. Start your camera, or choose a video file.");
+}
+let optTimer;
+function applyOptions() {
+  clearTimeout(optTimer);
+  optTimer = setTimeout(async () => { if (detector) { await detector.setOptions({ scoreThreshold: thr(), maxResults: max() }); lastFrameTime = -1; } }, 120);
+}
+
+/* ---------- Sources ---------- */
+async function startCamera() {
+  stopSource();
+  try { stream = await openCamera(video); mirror = true; begin(); }
+  catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function startVideo(url) {
+  stopSource();
+  video.srcObject = null; video.src = url; video.loop = true; mirror = false;
+  video.play().then(begin).catch((e) => msg("This video could not be played: " + e.message, true));
+}
+function stopSource() {
+  closeCamera(stream); stream = null;
+  video.pause(); video.removeAttribute("src"); video.srcObject = null; video.load();
+  active = false; objects = []; seen = {}; lastFrameTime = -1;
+  ["btnPlay", "btnStop", "btnSnap"].forEach((id) => ($(id).disabled = true));
+}
+function begin() {
+  hideMsg(); active = true; seen = {};
+  $("btnStop").disabled = $("btnSnap").disabled = false;
+  $("btnPlay").disabled = !!stream; $("btnPlay").textContent = "⏸ Pause";
+}
+function stop() {
+  stopSource(); $("hud").style.display = "none";
+  $("now").innerHTML = '<div class="empty">Start the camera or choose a video.</div>';
+  msg("Stopped. Start the camera or choose a video whenever you like.");
+}
+function togglePlay() {
+  if (stream || !active) return;
+  if (video.paused) { video.play(); $("btnPlay").textContent = "⏸ Pause"; } else { video.pause(); $("btnPlay").textContent = "▶ Play"; }
+}
+
+/* ---------- Main loop ---------- */
+function loop() {
+  requestAnimationFrame(loop);
+  if (!active || video.readyState < 2) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (!w) return;
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+
+  // Only run the model when the frame changed (a paused video keeps its last result)
+  const frameChanged = stream || video.currentTime !== lastFrameTime;
+  if (detector && !loading && frameChanged) {
+    lastFrameTime = video.currentTime;
+    const ts = Math.max(performance.now(), lastTs + 1); lastTs = ts;
+    const t0 = performance.now();
+    objects = simplify(detector.detectForVideo(video, ts).detections).sort((a, b) => b.score - a.score);
+    ms = ms ? ms * 0.8 + (performance.now() - t0) * 0.2 : performance.now() - t0;
+    fpsValue = fps();
+    updateLists();
+  }
+
+  ctx.save(); if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, w, h); ctx.restore();
+  drawBoxes(ctx, objects, { width: w, mirror });
+  $("hud").style.display = "";
+  $("hud").innerHTML = `<span><b>${objects.length}</b> objects</span><span><b>${fpsValue.toFixed(0)}</b> fps</span><span><b>${ms.toFixed(0)}</b> ms / frame</span>` +
+    (stream ? "" : `<span><b>${video.currentTime.toFixed(1)}</b> / ${(video.duration || 0).toFixed(1)} s</span>`);
+}
+
+let listTimer = 0;
+function updateLists() {
+  const counts = {};
+  for (const o of objects) counts[o.label] = (counts[o.label] || 0) + 1;
+  for (const [k, n] of Object.entries(counts)) seen[k] = Math.max(seen[k] || 0, n);
+  const now = performance.now(); if (now - listTimer < 200) return; listTimer = now;   // refresh the panel 5× per second
+  $("count").textContent = `· ${objects.length}`;
+  $("now").innerHTML = rows(counts, "Nothing above the confidence threshold.");
+  $("seen").innerHTML = rows(seen, "–");
+}
+const rows = (obj, empty) => {
+  const e = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  return e.length ? e.map(([k, n]) => `<div class="item"><i style="background:${colorFor(k)}"></i><span class="grow">${k}</span><span class="num">× ${n}</span></div>`).join("") : `<div class="empty">${empty}</div>`;
+};
+
+/* ---------- Wiring ---------- */
+wireFileInputs({ input: $("file"), stage: $("stage"), accept: ["video/"], onFile: (f) => startVideo(URL.createObjectURL(f)) });
+$("btnCam").onclick = startCamera;
+$("btnPlay").onclick = togglePlay;
+$("btnStop").onclick = stop;
+$("btnSnap").onclick = () => downloadCanvas(canvas, `detections_${Date.now()}.png`);
+$("model").onchange = () => loadModel().catch((e) => msg("Could not load the model: " + e.message, true));
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === " ") { e.preventDefault(); togglePlay(); }
+  if (e.key === "Escape" && active) stop();
+});
+requestAnimationFrame(loop);
+loadModel().catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>

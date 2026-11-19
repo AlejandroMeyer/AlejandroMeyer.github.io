@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit2_1 · Face Landmark Detection</title>
+<link rel="stylesheet" href="assets/css/vision.css">
+</head>
+<body>
+<header>
+  <h1>unit2_1 · Face Landmark Detection <small>MediaPipe Face Landmarker · 468-point 3D face mesh</small></h1>
+  <a href="../unit.html?unit=2">← Back to Unit 2</a>
+</header>
+<main>
+  <section>
+    <div class="stage" id="stage">
+      <canvas id="out" width="1280" height="720"></canvas>
+      <div class="hud" id="hud" style="display:none"></div>
+      <div class="msg" id="msg">Loading the face model…</div>
+    </div>
+    <div class="controls">
+      <label class="filebtn">📁 Upload photo<input type="file" id="file" accept="image/*"></label>
+      <button id="btnCam" disabled>🎥 Webcam snapshot</button>
+      <div class="seg" id="view">
+        <button data-v="annotated" class="on">Mesh</button><button data-v="original">Original</button><button data-v="side">Side by side</button>
+      </div>
+      <button id="btnPng" disabled>⬇ Image</button>
+      <button id="btnJson" disabled>⬇ JSON</button>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h3>DRAWING</h3>
+      <div class="field"><label>Style</label><select id="style"></select></div>
+      <div class="field"><label>Colors</label><select id="scheme"></select></div>
+      <div class="field"><label class="check"><input type="checkbox" id="black"> Draw on a black background</label></div>
+      <div class="field"><label>Line thickness <b id="thick-v"></b></label><input type="range" id="thick" min="1" max="3" step="0.5" value="1.5"></div>
+      <div class="field"><label>Dot size <b id="dot-v"></b></label><input type="range" id="dot" min="1" max="4" step="0.5" value="1.5"></div>
+      <div class="field"><label>Max faces <b id="faces-v"></b></label><input type="range" id="faces" min="1" max="5" step="1" value="3"></div>
+    </div>
+    <div class="card">
+      <h3>EXPRESSIONS <span id="count"></span></h3>
+      <div id="expr"><div class="empty">Upload, paste or drop a photo, or take one with your webcam.</div></div>
+    </div>
+    <div class="card muted">
+      Drag a photo onto the viewer or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste one. Expressions come from MediaPipe's 52 face blendshapes.
+      Everything runs in your browser: the photo never leaves your device.
+    </div>
+  </aside>
+</main>
+<video id="video" playsinline muted style="display:none"></video>
+
+<script type="module">
+import { $, msg, hideMsg, loadImage, wireFileInputs, openCamera, closeCamera, downloadCanvas, downloadJSON, segmented, slider } from "./assets/js/common.js";
+import { createLandmarker, drawFaces, renderExpressions, expressions, STYLES, SCHEMES } from "./assets/js/facemesh.js";
+
+const canvas = $("out"), ctx = canvas.getContext("2d"), video = $("video");
+let landmarker = null, image = null, result = null, ms = 0, stream = null, imageName = "photo";
+
+for (const [k, v] of Object.entries(STYLES)) $("style").add(new Option(v, k));
+for (const [k, v] of Object.entries(SCHEMES)) $("scheme").add(new Option(v.label, k));
+["style", "scheme", "black"].forEach((id) => ($(id).onchange = render));
+const getView = segmented($("view"), render);
+const thick = slider("thick", (v) => v + " px", render);
+const dot = slider("dot", (v) => v + " px", render);
+let facesTimer;
+const faces = slider("faces", (v) => v, () => {
+  clearTimeout(facesTimer);
+  facesTimer = setTimeout(async () => { if (landmarker) { await landmarker.setOptions({ numFaces: faces() }); run(); } }, 120);
+});
+
+async function load() {
+  landmarker = await createLandmarker({ mode: "IMAGE", numFaces: faces() });
+  $("btnCam").disabled = false;
+  msg("Ready. Upload, paste or drop a photo, or take one with your webcam.");
+}
+
+async function useImage(src, name) {
+  stopCamera();
+  try { image = await loadImage(src); imageName = name; run(); }
+  catch (e) { msg(e.message, true); }
+}
+
+function run() {
+  if (!landmarker || !image) return;
+  const t0 = performance.now();
+  result = landmarker.detect(image);
+  ms = performance.now() - t0;
+  const n = result.faceLandmarks.length;
+  if (n) hideMsg(); else msg("No face found in this photo. Try one where the face is clearly visible.");
+  $("count").textContent = `· ${n} face${n === 1 ? "" : "s"}`;
+  renderExpressions($("expr"), result);
+  $("btnPng").disabled = $("btnJson").disabled = false;
+  render();
+}
+
+function render() {
+  if (!image || !result) return;
+  const w = image.naturalWidth || image.width, h = image.naturalHeight || image.height, view = getView();
+  const gap = view === "side" ? Math.round(w * 0.02) : 0, ox = view === "side" ? w + gap : 0;
+  canvas.width = view === "side" ? w * 2 + gap : w; canvas.height = h;
+  ctx.fillStyle = "#05080d"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, w, h);
+  if (view !== "original") {
+    if ($("black").checked) { ctx.fillStyle = "#000"; ctx.fillRect(ox, 0, w, h); }
+    else if (view === "side") ctx.drawImage(image, ox, 0, w, h);
+    drawFaces(ctx, result.faceLandmarks, { width: w, height: h, offsetX: ox, style: $("style").value, scheme: $("scheme").value, thickness: thick(), pointRadius: dot() });
+  }
+  $("hud").style.display = "";
+  $("hud").innerHTML = `<span><b>${result.faceLandmarks.length}</b> faces</span><span><b>${result.faceLandmarks[0]?.length || 0}</b> points / face</span><span><b>${ms.toFixed(0)}</b> ms</span>`;
+}
+
+/* ---------- Webcam snapshot ---------- */
+async function toggleCamera() {
+  if (stream) return capture();
+  try {
+    stream = await openCamera(video);
+    $("btnCam").textContent = "📸 Take photo"; $("btnCam").classList.add("primary");
+    $("hud").style.display = "none"; msg("Click “Take photo” when you are ready.");
+    preview();
+  } catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function preview() {
+  if (!stream) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (w) { canvas.width = w; canvas.height = h; ctx.save(); ctx.translate(w, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0); ctx.restore(); }
+  requestAnimationFrame(preview);
+}
+function capture() {
+  const snap = document.createElement("canvas");
+  snap.width = video.videoWidth; snap.height = video.videoHeight;
+  const c = snap.getContext("2d"); c.translate(snap.width, 0); c.scale(-1, 1); c.drawImage(video, 0, 0);
+  stopCamera(); image = snap; imageName = "webcam"; run();
+}
+function stopCamera() {
+  if (!stream) return;
+  closeCamera(stream); stream = null;
+  $("btnCam").textContent = "🎥 Webcam snapshot"; $("btnCam").classList.remove("primary");
+}
+
+/* ---------- Wiring ---------- */
+wireFileInputs({ input: $("file"), stage: $("stage"), accept: ["image/"], onFile: (f) => useImage(f, f.name.replace(/\.[^.]+$/, "")) });
+$("btnCam").onclick = toggleCamera;
+$("btnPng").onclick = () => downloadCanvas(canvas, `${imageName}_face_mesh.png`);
+$("btnJson").onclick = () => downloadJSON({
+  image: imageName, width: image.naturalWidth || image.width, height: image.naturalHeight || image.height, inferenceMs: +ms.toFixed(1),
+  faces: result.faceLandmarks.map((lm, i) => ({
+    expressions: Object.fromEntries(Object.entries(expressions(result.faceBlendshapes[i])).map(([k, v]) => [k, +v.toFixed(3)])),
+    landmarks: lm.map((p) => [+p.x.toFixed(5), +p.y.toFixed(5), +p.z.toFixed(5)]),
+  })),
+}, `${imageName}_face_mesh.json`);
+
+load().catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>

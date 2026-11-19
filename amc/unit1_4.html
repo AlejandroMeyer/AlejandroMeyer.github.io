@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unit1_4 · Object Recognition</title>
+<link rel="stylesheet" href="assets/css/vision.css">
+</head>
+<body>
+<header>
+  <h1>unit1_4 · Object Recognition <small>MediaPipe Object Detector · EfficientDet-Lite · 80 classes</small></h1>
+  <a href="../unit.html?unit=1">← Back to Unit 1</a>
+</header>
+<main>
+  <section>
+    <div class="stage" id="stage">
+      <canvas id="out" width="1280" height="720"></canvas>
+      <video id="video" playsinline muted style="display:none"></video>
+      <div class="hud" id="hud" style="display:none"></div>
+      <div class="msg" id="msg">Loading the detection model…</div>
+    </div>
+    <div class="controls">
+      <label class="filebtn">📁 Upload image<input type="file" id="file" accept="image/*"></label>
+      <button id="btnCam" disabled>🎥 Webcam snapshot</button>
+      <div class="seg" id="view">
+        <button data-v="annotated" class="on">Annotated</button><button data-v="original">Original</button><button data-v="side">Side by side</button>
+      </div>
+      <button id="btnPng" disabled>⬇ Image</button>
+      <button id="btnJson" disabled>⬇ JSON</button>
+    </div>
+    <div class="samples">
+      <span class="lbl">Try a sample:</span>
+      <button data-src="assets/samples/sports.jpg"><img src="assets/samples/sports.jpg" alt=""><span>Sports</span></button>
+      <button data-src="assets/samples/fruits.jpg"><img src="assets/samples/fruits.jpg" alt=""><span>Fruits</span></button>
+      <button data-src="assets/samples/room.jpg"><img src="assets/samples/room.jpg" alt=""><span>Dogs</span></button>
+      <button data-src="assets/samples/traffic.jpg"><img src="assets/samples/traffic.jpg" alt=""><span>Beach</span></button>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h3>SETTINGS</h3>
+      <div class="field"><label>Model</label>
+        <select id="model"><option value="lite0">EfficientDet-Lite0 (fast)</option><option value="lite2">EfficientDet-Lite2 (more accurate)</option></select></div>
+      <div class="field"><label>Confidence threshold <b id="thr-v"></b></label><input type="range" id="thr" min="0.1" max="0.9" step="0.05" value="0.4"></div>
+      <div class="field"><label>Max detections <b id="max-v"></b></label><input type="range" id="max" min="1" max="25" step="1" value="10"></div>
+    </div>
+    <div class="card">
+      <h3>DETECTED OBJECTS <span id="count"></span></h3>
+      <div class="list" id="list"><div class="empty">Upload, paste or drop an image, or pick a sample.</div></div>
+    </div>
+    <div class="card muted">
+      Drag an image onto the viewer or press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a screenshot. Hover over an object in the list to highlight its box.
+      Everything runs in your browser: the image never leaves your device.
+    </div>
+  </aside>
+</main>
+
+<script type="module">
+import { $, msg, hideMsg, loadImage, wireFileInputs, openCamera, closeCamera, downloadCanvas, downloadJSON, segmented, slider } from "./assets/js/common.js";
+import { createDetector, simplify, drawBoxes, colorFor } from "./assets/js/objdet.js";
+
+const canvas = $("out"), ctx = canvas.getContext("2d"), video = $("video");
+let detector = null, image = null, objects = [], highlight = -1, ms = 0, stream = null, imageName = "image";
+
+const getView = segmented($("view"), render);
+const thr = slider("thr", (v) => Math.round(v * 100) + "%", applyOptions);
+const max = slider("max", (v) => v, applyOptions);
+
+async function loadModel() {
+  setBusy(true); msg("Loading the detection model…");
+  const old = detector;
+  detector = await createDetector({ model: $("model").value, mode: "IMAGE", scoreThreshold: thr(), maxResults: max() });
+  old?.close();
+  setBusy(false);
+  if (image) run(); else msg("Ready. Upload, paste or drop an image, or pick a sample below.");
+}
+function setBusy(b) { ["btnCam", "model"].forEach((id) => ($(id).disabled = b)); }
+
+let optTimer;
+function applyOptions() {
+  clearTimeout(optTimer);
+  optTimer = setTimeout(async () => { if (!detector) return; await detector.setOptions({ scoreThreshold: thr(), maxResults: max() }); if (image) run(); }, 120);
+}
+
+async function useImage(src, name) {
+  stopCamera();
+  try { image = await loadImage(src); imageName = name; run(); }
+  catch (e) { msg(e.message, true); }
+}
+
+function run() {
+  if (!detector || !image) return;
+  hideMsg();
+  const t0 = performance.now();
+  objects = simplify(detector.detect(image).detections).sort((a, b) => b.score - a.score);
+  ms = performance.now() - t0;
+  highlight = -1;
+  render(); renderList();
+  $("btnPng").disabled = $("btnJson").disabled = false;
+}
+
+function render() {
+  if (!image) return;
+  const w = image.naturalWidth || image.width, h = image.naturalHeight || image.height, view = getView();
+  const gap = view === "side" ? Math.round(w * 0.02) : 0;
+  canvas.width = view === "side" ? w * 2 + gap : w; canvas.height = h;
+  ctx.fillStyle = "#05080d"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, w, h);
+  if (view === "side") ctx.drawImage(image, w + gap, 0, w, h);
+  if (view !== "original") drawBoxes(ctx, objects, { width: w, offsetX: view === "side" ? w + gap : 0, highlight });
+  $("hud").style.display = "";
+  $("hud").innerHTML = `<span><b>${objects.length}</b> objects</span><span><b>${ms.toFixed(0)}</b> ms</span><span><b>${w}×${h}</b> px</span>`;
+}
+
+function renderList() {
+  $("count").textContent = `· ${objects.length}`;
+  if (!objects.length) { $("list").innerHTML = '<div class="empty">Nothing found above the confidence threshold. Try lowering it.</div>'; return; }
+  $("list").innerHTML = objects.map((o, i) =>
+    `<div class="item" data-i="${i}"><i style="background:${colorFor(o.label)}"></i><span class="grow">${o.label}</span><span class="num">${Math.round(o.score * 100)}%</span></div>`).join("");
+}
+$("list").addEventListener("mouseover", (e) => { const it = e.target.closest(".item"); if (it && +it.dataset.i !== highlight) { highlight = +it.dataset.i; render(); } });
+$("list").addEventListener("mouseleave", () => { highlight = -1; render(); });
+
+/* ---------- Webcam snapshot: live preview, then capture one frame ---------- */
+async function toggleCamera() {
+  if (stream) return capture();
+  try {
+    stream = await openCamera(video);
+    $("btnCam").textContent = "📸 Take photo"; $("btnCam").classList.add("primary");
+    $("hud").style.display = "none"; msg("Click “Take photo” when you are ready.");
+    preview();
+  } catch (e) { msg("Camera not available: " + e.message, true); }
+}
+function preview() {
+  if (!stream) return;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (w) { canvas.width = w; canvas.height = h; ctx.save(); ctx.translate(w, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0); ctx.restore(); }
+  requestAnimationFrame(preview);
+}
+function capture() {
+  const snap = document.createElement("canvas");
+  snap.width = video.videoWidth; snap.height = video.videoHeight;
+  const c = snap.getContext("2d"); c.translate(snap.width, 0); c.scale(-1, 1); c.drawImage(video, 0, 0);
+  stopCamera();
+  image = snap; imageName = "webcam"; run();
+}
+function stopCamera() {
+  if (!stream) return;
+  closeCamera(stream); stream = null;
+  $("btnCam").textContent = "🎥 Webcam snapshot"; $("btnCam").classList.remove("primary");
+}
+
+/* ---------- Wiring ---------- */
+wireFileInputs({ input: $("file"), stage: $("stage"), accept: ["image/"], onFile: (f) => useImage(f, f.name.replace(/\.[^.]+$/, "")) });
+document.querySelectorAll(".samples button").forEach((b) => (b.onclick = () => useImage(b.dataset.src, b.textContent.trim().toLowerCase().replace(/\s+/g, "_"))));
+$("btnCam").onclick = toggleCamera;
+$("model").onchange = () => loadModel().catch((e) => msg("Could not load the model: " + e.message, true));
+$("btnPng").onclick = () => downloadCanvas(canvas, `${imageName}_detections.png`);
+$("btnJson").onclick = () => downloadJSON({
+  image: imageName, model: $("model").value, scoreThreshold: thr(), maxResults: max(),
+  width: image.naturalWidth || image.width, height: image.naturalHeight || image.height, inferenceMs: +ms.toFixed(1),
+  detections: objects.map((o) => ({ label: o.label, score: +o.score.toFixed(4), box: Object.fromEntries(Object.entries(o.box).map(([k, v]) => [k, Math.round(v)])) })),
+}, `${imageName}_detections.json`);
+
+loadModel().catch((e) => msg("Could not load the model: " + e.message, true));
+</script>
+</body>
+</html>
