@@ -1,2 +1,2 @@
 Video Face landmark detection
-https://drluarn.github.io/
+https://alejandromeyer.github.io/amc/unit2_2.html
