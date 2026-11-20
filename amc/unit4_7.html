@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zahlwerk - Your AI controller (Demo prototype)</title>
+<style>
+  :root {
+    --ink: #1c2430;
+    --muted: #5a6573;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --brand: #1f4e79;
+    --brand-dark: #163a5a;
+    --accent: #e0a526;
+    --line: #dde2e8;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--brand); }
+
+  /* Header */
+  .site-header { background: var(--card); border-bottom: 1px solid var(--line); }
+  .site-header .wrap { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; padding-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+  .logo { font-weight: 800; font-size: 1.35rem; letter-spacing: .5px; color: var(--brand); text-decoration: none; }
+  .logo span { color: var(--accent); }
+  .site-header nav a { margin-left: 18px; text-decoration: none; color: var(--muted); font-size: .95rem; }
+  .site-header nav a:hover { color: var(--brand); }
+
+  /* Buttons */
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 6px; font-weight: 600; text-decoration: none; border: 2px solid var(--brand); }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn-secondary { background: transparent; color: var(--brand); }
+  .btn-secondary:hover { background: #eaf0f6; }
+  .btn-light { background: #fff; color: var(--brand); border-color: #fff; }
+  .btn-outline-light { background: transparent; color: #fff; border-color: #fff; }
+
+  /* Hero */
+  .hero { background: linear-gradient(135deg, #1f4e79 0%, #2c6aa0 100%); color: #fff; padding: 72px 0 56px; }
+  .slogan { display: inline-block; font-size: .9rem; font-weight: 600; background: rgba(255,255,255,.14); padding: 4px 12px; border-radius: 20px; margin: 0 0 18px; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.15; margin: 0 0 18px; max-width: 760px; }
+  .hero .sub { font-size: 1.1rem; max-width: 720px; margin: 0 0 28px; color: #e6eef6; }
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .hero-ctas .link { color: #fff; font-weight: 600; }
+  .trust { margin-top: 36px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.25); font-size: .95rem; color: #d6e2ee; }
+
+  /* Benefits */
+  .benefits { padding: 64px 0; }
+  .section-title { font-size: 1.8rem; margin: 0 0 8px; }
+  .section-lead { color: var(--muted); margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 26px; border-top: 4px solid var(--brand); }
+  .card .num { display: inline-block; width: 32px; height: 32px; line-height: 32px; text-align: center; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; margin-bottom: 10px; }
+  .card h3 { margin: 0 0 10px; font-size: 1.2rem; }
+  .card p { margin: 0 0 12px; color: #34404d; }
+  .card ul { padding-left: 20px; margin: 0 0 12px; color: #34404d; }
+  .card li { margin-bottom: 6px; }
+  .card .note { font-size: .92rem; color: var(--muted); }
+  .receipt { margin-top: 26px; background: #fff8e8; border: 1px solid #f0d9a2; border-radius: 10px; padding: 18px 22px; }
+  .receipt p { margin: 0; }
+
+  /* CTA */
+  .cta { background: var(--brand-dark); color: #fff; padding: 64px 0; text-align: center; }
+  .cta h2 { font-size: clamp(1.6rem, 4vw, 2.3rem); margin: 0 0 16px; }
+  .cta p { max-width: 720px; margin: 0 auto 28px; color: #dbe5ef; }
+  .cta-buttons { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
+  .cta .tertiary { color: #fff; }
+
+  /* Demo notice */
+  .demo-notice { padding: 40px 0; }
+  .demo-notice .box { background: var(--card); border: 1px dashed var(--muted); border-radius: 10px; padding: 22px; }
+  .demo-notice h2 { margin: 0 0 8px; font-size: 1.2rem; }
+  .demo-notice p { margin: 0; color: var(--muted); }
+
+  /* Footer */
+  .site-footer { border-top: 1px solid var(--line); background: var(--card); padding: 24px 0; font-size: .88rem; color: var(--muted); }
+  .site-footer p { margin: 4px 0; }
+
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: 1fr; }
+    .site-header nav a { margin: 0 14px 0 0; }
+    .hero { padding: 48px 0 40px; }
+    .btn { width: 100%; text-align: center; }
+    .hero-ctas .link { width: 100%; text-align: center; }
+  }
+  .team-files a { color: inherit; text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="#top">Zahl<span>werk</span></a>
+    <nav>
+      <a href="#benefits">Benefits</a>
+      <a href="#cta">Pilot</a>
+      <a href="#cta" class="nav-demo">Book a demo</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <p class="slogan">Your AI controller. Reliable figures in weeks, not months.</p>
+      <h1 id="hero-title">Your AI controller for the Mittelstand.</h1>
+      <p class="sub">Zahlwerk connects to the ERP, DATEV and Excel files you already use and delivers German-language finance and sales reporting in weeks. You do not need a data team, DAX or a migration. Hosted in Germany, with the works council package included.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-light" href="#demo-notice">Book a 30-minute demo</a>
+        <a class="link" href="#demo-notice">Download the works council fact sheet</a>
+      </div>
+      <p class="trust">Hosted in Germany &middot; No training on your data &middot; EU-only AI processing &middot; Flat company price</p>
+    </div>
+  </section>
+
+  <section class="benefits" id="benefits" aria-labelledby="benefits-title">
+    <div class="wrap">
+      <h2 class="section-title" id="benefits-title">Key Benefits</h2>
+      <p class="section-lead">Built for CFOs, heads of controlling and controllers in German manufacturing and wholesale.</p>
+
+      <div class="grid">
+        <article class="card">
+          <span class="num">1</span>
+          <h3>It speaks Mittelstand finance</h3>
+          <p>Zahlwerk is built for German controlling, not adapted to it after the fact. It works with DATEV exports, the SKR03 and SKR04 charts of accounts and leading mid-market ERPs. You can ask it questions in your own terms, such as <em>Deckungsbeitrag</em>, <em>BWA</em> or <em>Kostenstelle</em>, and it answers in German.</p>
+          <p>The AI agent prepares the data, builds your monthly close reports and answers follow-up questions, like a controller who never runs out of time. Your team works on the analysis, not on copy-and-paste.</p>
+        </article>
+
+        <article class="card">
+          <span class="num">2</span>
+          <h3>Works council ready from day one</h3>
+          <p>In Germany, introducing AI is often slowed down by the works council, not by the technology. Zahlwerk ships with what those talks need:</p>
+          <ul>
+            <li>A <strong>template works agreement (Betriebsvereinbarung)</strong> drafted with employment-law specialists, plus a technical fact sheet for the works council</li>
+            <li><strong>Employee-level data anonymised or aggregated by default</strong>, so there are no per-employee views unless you choose to turn them on</li>
+            <li>A <strong>data processing agreement (AVV)</strong>, a list of subprocessors, a disclosure of how AI requests are routed, and a firm commitment that your data is never used for training</li>
+            <li>AI-literacy onboarding material and transparency labels to support your EU AI Act obligations</li>
+          </ul>
+          <p class="note">Zahlwerk is a finance and controlling tool. It does not evaluate employee performance.</p>
+        </article>
+
+        <article class="card">
+          <span class="num">3</span>
+          <h3>One price, no surprises</h3>
+          <p>You pay one flat monthly price per company, with AI usage included. There are no capacity units, no per-user AI surcharges and no bill that grows every time someone asks a question. A fixed-scope starter package lets you begin small and expand once the value is proven.</p>
+        </article>
+
+        <article class="card">
+          <span class="num">4</span>
+          <h3>Up and running in weeks, with your systems as they are</h3>
+          <p>Zahlwerk works with the ERP you run today, so there is no S/4HANA migration and no data warehouse project first. Your controllers can keep Excel: it remains available as both an input and an export channel, alongside Power BI export.</p>
+        </article>
+      </div>
+
+      <div class="receipt">
+        <p><strong>And every figure has a receipt.</strong> Every number in a report or answer links back to the ERP or DATEV booking it came from, so your controllers and auditors can check it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="cta" aria-labelledby="cta-title">
+    <div class="wrap">
+      <h2 id="cta-title">See your own monthly close, automated.</h2>
+      <p>Start with a fixed-price pilot on your own data. We connect your ERP and DATEV, set up your core reports (P&amp;L, liquidity, cost centres) and give your works council and data protection officer everything they need to review the solution. Ask us about support with state digitalisation grants and KfW funding.</p>
+      <div class="cta-buttons">
+        <a class="btn btn-light" href="#demo-notice">Book a demo</a>
+        <a class="btn btn-outline-light" href="#demo-notice">Talk to us about a pilot</a>
+      </div>
+      <a class="tertiary" href="#demo-notice">Read the guide: "Works council and AI agents"</a>
+    </div>
+  </section>
+
+  <section class="demo-notice" id="demo-notice" aria-labelledby="demo-notice-title">
+    <div class="wrap">
+      <div class="box">
+        <h2 id="demo-notice-title">Demo prototype</h2>
+        <p>This is a demo page. The buttons and links above do not book appointments, send forms or download files, and no data is collected.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p><strong>Zahlwerk</strong> is a fictional working name used for a concept study.</p>
+    <p>Demo prototype created by a multi-agent AI team for a university assignment. Not a real product; no data is collected.</p>
+    <p class="team-files">Made with the <em>venture-team</em> skill (6 agents): <a href="unit4_7/01-research.md">01 Research</a> · <a href="unit4_7/02-strategy.md">02 Strategy</a> · <a href="unit4_7/03-copywriting.md">03 Copy</a> · <a href="unit4_7/04-prototype/index.html">04 Prototype</a> · <a href="unit4_7/05-qa-report.md">05 QA</a> · <a href="unit4_7/06-final-review.md">06 Final review</a></p>
+    <p class="team-files"><a href="../unit.html?unit=4">← Back to Unit 4</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
