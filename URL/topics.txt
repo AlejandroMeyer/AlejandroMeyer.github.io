@@ -42,3 +42,5 @@ unit6_3:Hark Pro
 unit6_4:OpenAI Dots
 unit6_5:Grok bot
 unit6_6:Claude duet
+unit6_7:Extra Credit Challenge
+unit6_8:Cue! AI video: Ancient Wuxia Flying Sword (Extra Credit)
