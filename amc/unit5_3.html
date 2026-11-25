@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unit 5.3 · ChatGPT Skills · Venture Team: Semesterhirn</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+:root{--ink:#13213a;--soft:#3d4a63;--paper:#f6f3ec;--card:#fff;--accent:#e0662f;--teal:#1f6f78;--line:#d9d3c6;--ok:#2f8f5b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.top{background:var(--ink);color:#f6f3ec}
+.top .wrap{padding-top:16px;padding-bottom:16px}
+.badge{display:inline-block;background:var(--accent);color:#fff;border-radius:999px;padding:5px 13px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+header.hero{padding:40px 0 26px}
+header.hero .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--teal)}
+header.hero h1{font-size:clamp(30px,4.6vw,48px);line-height:1.08;letter-spacing:-.03em;margin:8px 0 14px}
+header.hero h1 span{color:var(--accent)}
+.cmd{display:inline-block;font:600 14px/1.4 ui-monospace,Consolas,monospace;background:var(--ink);color:#ffd2bd;border-radius:10px;padding:9px 14px;max-width:100%;overflow-x:auto}
+h2.sec{font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);margin:34px 0 14px}
+.pipe{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.step{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:transform .15s,border-color .15s}
+.step:hover,.step.on{border-color:var(--accent);transform:translateY(-2px)}
+.step .n{font-size:11.5px;font-weight:800;color:var(--accent);letter-spacing:.08em}
+.step b{display:block;font-size:15.5px;margin:2px 0 4px}
+.step small{display:block;color:var(--soft);font-size:12.5px;line-height:1.4}
+.step .st{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;background:#e3f1e8;color:var(--ok)}
+.step:not(:last-child)::after{content:"→";position:absolute;right:-6px;top:50%;transform:translate(50%,-50%);color:var(--accent);font-weight:800;z-index:2}
+.qa-loop{margin-top:12px;font-size:13.5px;color:var(--soft);background:#fff;border:1px dashed var(--accent);border-radius:12px;padding:9px 14px}
+.qa-loop b{color:var(--ink)}
+.proto{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 18px 40px -26px rgba(19,33,58,.45)}
+.proto .bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#efeae0;font-size:13px}
+.proto .bar i{width:11px;height:11px;border-radius:50%;background:#d8cfbf;display:inline-block}
+.proto .bar a{margin-left:auto;font-weight:700;color:var(--accent);text-decoration:none}
+.proto iframe{width:100%;height:640px;border:0;display:block;background:#f6f3ec}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;font-weight:700;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.doc{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:8px 32px 26px;overflow-x:auto}
+.doc h1{font-size:28px;letter-spacing:-.02em;line-height:1.2}
+.doc h2{font-size:21px;margin-top:28px;border-top:1px solid var(--line);padding-top:20px}
+.doc h3{font-size:17px}
+.doc a{color:var(--teal);word-break:break-word}
+.doc table{border-collapse:collapse;width:100%;font-size:14px;margin:12px 0;display:block;overflow-x:auto}
+.doc th,.doc td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+.doc th{background:#f1ece2}
+.doc code{background:#f1ece2;border-radius:5px;padding:1px 5px;font-size:13px}
+.doc .file{display:inline-block;margin-top:16px;font:600 12.5px ui-monospace,Consolas,monospace;color:var(--teal)}
+footer{padding:30px 0 40px;color:var(--soft);font-size:13px}
+@media(max-width:900px){.pipe{grid-template-columns:repeat(2,1fr)}.step::after{display:none}.proto iframe{height:560px}.doc{padding:4px 18px 20px}}
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap"><span class="badge">Unit 5.3 · ChatGPT Skills · Alejandro Meyer</span></div></div>
+<main class="wrap">
+<header class="hero">
+  <div class="eyebrow">Venture Team · 6 agents coordinated by a CEO</div>
+  <h1>Semester<span>hirn</span>: an AI second brain for university students in Germany</h1>
+  <code class="cmd">/venture-team AI Second Brain app for university students, Germany</code>
+</header>
+
+<h2 class="sec">The agent pipeline</h2>
+<div class="pipe">
+  <button class="step" data-doc="research"><span class="n">01</span><b>Research</b><small>Market, competitors, customers, regulation</small><span class="st">Complete</span></button>
+  <button class="step" data-doc="strategy"><span class="n">02</span><b>Strategy</b><small>Positioning, segments, go-to-market</small><span class="st">Complete</span></button>
+  <button class="step" data-doc="copy"><span class="n">03</span><b>Copywriter</b><small>Slogan, landing copy, talking points</small><span class="st">Complete</span></button>
+  <button class="step" data-doc="proto"><span class="n">04</span><b>Developer</b><small>One-page prototype in HTML</small><span class="st">Complete</span></button>
+  <button class="step" data-doc="qa2"><span class="n">05</span><b>QA</b><small>Structure, copy, render and form checks</small><span class="st">Passed · round 2</span></button>
+  <button class="step" data-doc="review"><span class="n">06</span><b>Reviewer</b><small>Integrated review and next steps</small><span class="st">Complete</span></button>
+</div>
+<div class="qa-loop"><b>QA correction loop:</b> round 1 found 2 MUST FIX issues (clipped labels in the hero illustration) → the Developer fixed them → round 2: 0 MUST FIX, passed as a concept demonstrator.</div>
+
+<h2 class="sec" id="proto">04 · Prototype</h2>
+<div class="proto">
+  <div class="bar"><i></i><i></i><i></i><span>04-prototype/index.html</span><a href="unit5_3_prototype.html" target="_blank" rel="noopener">Open full page ↗</a></div>
+  <iframe src="unit5_3_prototype.html" title="Semesterhirn prototype landing page"></iframe>
+</div>
+
+<h2 class="sec" id="docs">Agent outputs</h2>
+<div class="tabs" id="tabs"></div>
+<article class="doc" id="doc"></article>
+</main>
+<footer class="wrap">venture-team skill in ChatGPT · Unit 5.3 · New Frontiers of AI</footer>
+
+<script type="text/markdown" id="md-review" data-label="06 · Final review" data-file="06-final-review.md">
+# Integrated Project Review: Semesterhirn (AI Second Brain for University Students, Germany)
+
+## Executive Summary
+The research shows a large, AI-ready audience: 2.86 million students (Destatis, WS 2025/26), about 92% of whom use AI tools for their studies (h_da 2025). It also shows that current use is ad-hoc chat rather than persistent knowledge building, and that exams are the main stressor (49%, TK 2026). The strategy turns this into a clear position: a private, exam-oriented AI second brain organised by course, with trust (EU processing, no training, no sharing) as a differentiator against both US tools and content-sharing study apps. The copy and the prototype express that position faithfully and honestly, as a beta waitlist with privacy framed as launch commitments. The concept is coherent, but the business case depends on two unvalidated points: whether students will pay when strong free alternatives exist, and whether uploading lecture material is legally acceptable.
+
+## Deliverables and Status
+| Phase | Deliverable | Status |
+|---|---|---|
+| 1. Research | `01-research.md` | Complete. 6 evidence gaps flagged (willingness to pay, competitor usage shares, legal status, AI Act dates from secondary sources, 2021 budget data) |
+| 2. Strategy | `02-strategy.md` | Complete. Pricing and Segment 2 pains marked "Insufficient evidence" |
+| 3. Copywriting | `03-copywriting.md` | Complete. No unsupported claims |
+| 4. Prototype | `04-prototype/index.html` | Complete. Single self-contained page, demo only |
+| 5. QA | `05-qa-report.md`, `05-qa-report-v2.md` | Passed after 1 correction round (2 MUST FIX resolved). 5 SHOULD IMPROVE items open |
+| 6. Review | `06-final-review.md` | Complete |
+
+## Strengths
+1. **The strategy follows from the evidence.** Each strategic choice traces back to a cited finding: exam focus (TK 2026), persistence over chat (CHE, Konstanz), and trust as a differentiator (university copyright guidance, GDPR-compliant university AI rollouts).
+2. **The trust angle turns a barrier into an advantage.** Copyright restrictions on uploading slides hurt content-sharing apps (StudySmarter / Knowunity model) more than a private-by-default tool.
+3. **Honest messaging.** There are no invented metrics or testimonials. Privacy points are worded as commitments, and the prototype labels itself a demo in three places. That lowers legal and reputational risk for a waitlist test.
+4. **Avoiding AI Act high-risk areas on purpose** (no grading or level placement) keeps the product in a lighter regulatory category. This still needs legal confirmation.
+
+## Areas to Improve
+1. **The commercial model is the weakest link.** Notion (free Plus for students), Obsidian (free), Capacities (free plan), NotebookLM (free for education institutions) and university Chat AI all cost nothing. No German willingness-to-pay data was found. The freemium hypothesis is untested.
+2. **The legal foundation is unconfirmed.** The core workflow (uploading lecture slides) is exactly what some university guidance warns against (HOOU@HAW, HM, Bamberg template). If the "private, EU, no training" setup isn't enough under § 16 UrhG, the product would need to shift towards students' own notes, which weakens the value.
+3. **The closest competitor is under-analysed.** Capacities is German, has a student discount and a student page. Its roadmap toward study-specific features could close our gap quickly. A hands-on teardown is missing.
+4. **Language mismatch.** The prototype is English-only, while the primary segment is German students.
+5. **Segment 2 (international students) rests on volume data only**, not on evidence about their pains.
+6. **Some time-sensitive facts come from secondary sources** (AI Act Digital Omnibus dates; Notion AI inclusion; Google student offer status) and need primary verification before external use.
+
+## Priority Next Steps
+Ordered by impact and dependency:
+1. **Legal check (blocking).** Get specialist advice on copyright for uploading lecture material to a private, EU-hosted, no-training tool, and on AI Act scope. This decides whether the core workflow is viable.
+2. **20 problem interviews** (12 Segment 1, 8 Segment 2). Test the exam-prep pain, current tool stack and willingness to pay. This fills the main evidence gaps and confirms or kills Segment 2.
+3. **Capacities and NotebookLM hands-on teardown.** Confirm the differentiation holds in practice, not just on pricing pages.
+4. **Make the prototype test-ready.** Add a German version, a DSGVO privacy notice and Impressum, a real form backend and a fake-door price test (depends on step 1 for wording).
+5. **Run the waitlist test before an exam period**, with go/no-go thresholds defined in advance.
+6. **Verify secondary-source facts** (AI Act dates in the Official Journal; Notion and Google offers on their official pages) before any external presentation.
+
+</script>
+<script type="text/markdown" id="md-research" data-label="01 · Research" data-file="01-research.md">
+# Market Research Report: AI Second Brain App for University Students in Germany
+
+Prepared: 25 November 2026. Scope: B2C study and knowledge-management apps with AI for students at German higher education institutions (Hochschulen). Facts are cited next to the claim. Interpretation is marked **Interpretation**. Estimates are marked **Estimate**. Missing data is marked **Not publicly verified / Data not found**.
+
+## 1. Market Trends Summary
+
+### 1.1 Market size (addressable population)
+- Germany had **2,864,200 students in winter semester 2025/26** (Destatis, press release no. 401, 16 Nov 2026: https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/11/PD26_401_213.html). A Destatis table shows a first preliminary value of 2,876,938 for the same term (https://www.destatis.de/EN/Themes/Society-Environment/Education-Research-Culture/Institutions-Higher-Education/Tables/total-states-further-indicated-winter-term.html). The gap comes from preliminary vs. later figures. Use the November 2026 press release value.
+- About **308,000 people started a degree** in WS 2025/26, and 69% of first-year students stayed in their home federal state (Destatis via zm-online, Oct 2026: https://www.zm-online.de/news/detail/ueber-zwei-drittel-aller-erstis-bleiben-im-heimatbundesland; Destatis Zahl der Woche, 6 Oct 2026: https://www.destatis.de/DE/Presse/Pressemitteilungen/Zahl-der-Woche/2026/PD26_41_p002.html).
+- Around **402,000 international students and doctoral candidates** were enrolled in WS 2024/25, about 6% more than the year before. The DAAD forecasts around 420,000 for WS 2025/26 (DAAD, Wissenschaft weltoffen 2025: https://www.daad.de/de/pressemitteilungen/2025/erneut-hohe-zahl-internationaler-studierender-in-deutschland/; DAAD quick survey: https://www.daad.de/de/pressemitteilungen/2025/zahl-internationaler-studierender-deutlich-ueber-400000/).
+- In WS 2025/26, German universities offer 22,426 degree programmes, and the number of English-taught programmes has risen in recent years (HRK statistics WS 2025/26: https://www.hrk.de/fileadmin/redaktion/hrk/02-Dokumente/02-03-Studium/02-03-01-Studium-Studienreform/HRK_Statistik_BA_MA_UEbrige_WiSe_2025_26.pdf).
+- **Market value in EUR for student note-taking / PKM apps in Germany: Not publicly verified / Data not found.**
+
+### 1.2 Demand driver: AI is already mainstream in studying
+- A nationwide Hochschule Darmstadt study found that **about 92% of students use AI tools for their studies (2025)**, up from about 63% in 2023. Sample: 4,910 students from 395 institutions. ChatGPT and DeepL are the most popular tools. Engineering students reach about 96% (h_da via Forschung & Lehre, 25 Mar 2025: https://www.forschung-und-lehre.de/lehre/ueber-90-prozent-der-studierenden-nutzen-ki-tools-6989; full study: https://opus4.kobv.de/opus4-h-da/frontdoor/deliver/index/docId/533/file/gpt-dokumentation-final-jvg.pdf).
+- CHE DatenCHECK (survey from WS 2024/25, 23,288 students at 171 institutions in Germany and Austria): **25% use AI daily and another 40% at least weekly**. Only 1 in 16 has never used AI in their studies. Students mostly use AI as a "sparring partner" for research and brainstorming, and they are rather dissatisfied with their university's AI skills offering (idw, 2025: https://idw-online.de/de/news853668; https://idw-online.de/en/pdfnews853668).
+- Studierendensurvey Konstanz (WS 2024/25): most students use AI, ChatGPT is the most used tool, and the most common uses are getting into a topic and processing text. Literature research and data analysis are much less common. Students rarely feel supported by their university when using AI (https://kops.uni-konstanz.de/server/api/core/bitstreams/8d6d5461-fb3d-4a09-abde-4f47e4f3832e/content).
+
+**Interpretation:** Adoption is no longer the barrier. Usage is dominated by general chatbots for ad-hoc questions, not by tools that build a persistent, organised knowledge base across a semester. That gap is the opening for a "second brain" product.
+
+### 1.3 Demand driver: stress and time pressure
+- TK-Dossier 2026 (Forsa, 1,000 students, January 2026, published 10 Jun 2026): **41% of students often feel stressed** (23% in 2015). **Exams are the top stressor (49%)**, 34% feel pressure from combining study and work, and about 35% show high or very high emotional exhaustion (TK: https://www.tk.de/presse/themen/praevention/gesundheitsstudien/stressbelastung-bei-studierenden-auf-hohem-niveau-2218636; https://www.tk.de/firmenkunden/service/gesund-arbeiten/gesundheitsberichterstattung/tk-dossier-2026-wie-gehts-deutschlands-studierenden-2218660; Ärzteblatt, 10 Jun 2026: https://www.aerzteblatt.de/news/rubriken/hochschulen/studierende-haufig-doppelt-belastet-efb68b93-c7e4-413a-9909-5e179727d721).
+
+**Interpretation:** The strongest pull is exam preparation and saving time, not "knowledge management" as an abstract idea. Positioning should start from exams.
+
+### 1.4 Policy and regulatory direction
+- Many universities now give members free, GDPR-compliant access to LLMs. Examples: GWDG "Chat AI" via the Academic Cloud at Bremen (since 2025), Kassel, Duisburg-Essen and Marburg, and the open-source HAWKI portal at several universities (Uni Bremen: https://www.uni-bremen.de/digitale-transformation/einsatz-von-ki/chatai-grundlagen; Uni Kassel, Mar 2025: https://www.uni-kassel.de/its/?id=3160; Uni Marburg, 28 Feb 2025: https://www.uni-marburg.de/de/forschung/kontakt/eresearch/aktuelles/nachrichten/chatai-und-voiceai; HAWKI, Hochschule Hannover 2025: https://serwiss.bib.hs-hannover.de/frontdoor/deliver/index/docId/3787/file/3787-PDFA.pdf). Baden-Württemberg ran the bwGPT project for data-protection-compliant GPT access (KIT/Hochschule Aalen: https://www.zml.kit.edu/downloads/bwGPT_Abschlussempfehlung_final.pdf).
+- EU AI Act: Annex III treats some education uses as high-risk, including admissions, evaluation of learning outcomes, assessing the appropriate level of education, and exam monitoring (EU AI Act Service Desk: https://ai-act-service-desk.ec.europa.eu/en/education-and-vocational-training). According to secondary sources, the "Digital Omnibus on AI" moved Annex III high-risk obligations from 2 Aug 2026 to **2 Dec 2027**, entering into force on 27 Jul 2026 (winssolutions, 12 Aug 2026: https://www.winssolutions.org/eu-ai-act-education-deadline-deferred/; CASRAI: https://casrai.org/wp/tag/ai-act-annex-iii/). **These dates come from secondary sources and should be checked against the Official Journal.**
+
+## 2. Main Competitors
+
+| Competitor | Type / origin | Positioning and price for students | Strengths | Weaknesses (for this use case) |
+|---|---|---|---|---|
+| **Notion** | US all-in-one workspace | Plus plan free for students with a school email. Plus includes only a *trial* of Notion AI. The help center mentions 50% off AI with the Education plan (https://www.notion.com/pricing; https://www.notion.com/th/help/notion-for-education) | Huge mindshare, templates, flexible databases | AI is not fully included for free students. Third-party sources disagree on AI inclusion in 2026 (e.g. https://aitoolpick.org/blog/notion-pricing-2026/ vs https://coursiv.io/blog/notion-ai-for-students/), so this needs checking. **Interpretation:** a generic tool that students have to structure themselves |
+| **Obsidian** | Canadian local-first Markdown app | Free for everything, no account needed. Sync costs $4/month (billed annually), with 40% off Sync/Publish for students (https://obsidian.md/pricing; https://obsidian.md/blog/free-for-work/, 20 Feb 2025) | Data stays local in plain Markdown, no telemetry, strong graph/linking culture | **Interpretation:** steep setup effort. AI depends on third-party plugins (official AI status **Not publicly verified**) |
+| **Capacities** | German PKM (Capacities Labs GmbH, St. Wendel) | Free plan forever. Pro has an AI assistant; 40% off annual Pro for enrolled students (https://docs.capacities.io/more/discount; https://capacities.io/back-to-school; https://european-alternatives.eu/product/capacities) | German company, object-based notes, a student landing page with tasks and calendar (https://capacities.io/for/students). EU data hosting claimed by a secondary source (https://europeanstack.pages.dev/software/capacities, **verify**) | **Interpretation:** general PKM, not built around courses, exams or lecture material. Closest direct competitor |
+| **Google NotebookLM / Gemini** | US big tech | Available in Germany (CIO.de: https://www.cio.de/article/3697987/google-bringt-notebooklm-nach-deutschland.html). Free for qualifying education institutions in Workspace for Education (https://edu.google.com/intl/ALL_uk/ai-notebooklm/). A 12-month free AI Pro offer for EMEA students ran in autumn 2025 (Google blog, 13 Oct 2025: https://blog.google/products/gemini/bringing-the-best-ai-to-university-students-in-europe-the-middle-east-and-africa-at-no-cost/); Google's student page now says it has expired (https://grow.google/student) | Source-grounded answers, audio overviews, mind maps, study guides, quizzes (heise: https://heise.de/-10509578) | **Interpretation:** organised by notebook rather than as a semester-long connected base. Data-protection sensitivity at German universities around US cloud providers |
+| **StudySmarter / Vaia** | German study app (StudySmarter GmbH) | Freemium with premium plans in the App Store. Claims "40M+ learners" (self-reported) (https://apps.apple.com/DE/app/id1439949520) | AI flashcards, summaries from slides, study planner, shared materials | Broad school + university focus. App Store privacy label lists data used for tracking (https://apps.apple.com/kr/app/id1439949520). The shared-materials model clashes with university copyright guidance (see section 4) |
+| **Knowunity** | German (Berlin) AI study companion | €27M Series B (June 2025), 20M+ users in 15 countries, used by "one in three" students in Germany (tech.eu, 13 Jun 2025: https://tech.eu/2025/06/13/knowunity-raises-eur27m-to-bring-ai-tutor-to-1-billion-students/; BeBeez/EU-Startups: https://bebeez.eu/2025/06/13/german-edtech-startup-knowunity-raises-e27-million-to-bring-ai-tutor-to-1-billion-students) | Strong brand with young users, AI tutor, creator content | **Interpretation:** focused mainly on school pupils ("Schüler"). The "one in three" figure most likely refers to pupils, not university students. Its university share is **Not publicly verified** |
+| **University-provided chat AI** (GWDG Chat AI, HAWKI, bwGPT) | Public / academic | Free for members, GDPR-compliant (sources in 1.4) | Free, trusted, institution-approved | **Interpretation:** chat interfaces without a persistent personal knowledge base. HAWKI instances may not save chat histories after a session (https://mapping.cms.hu-berlin.de/en/details/f39cbc89-d5dc-484c-a7ec-f12d1a7a2094.html) |
+
+## 3. Target Customer Profiles
+
+Evidence-based profiles. Pains come from the surveys above. Profiles are **Interpretation** built on that evidence.
+
+**A. Exam-heavy Bachelor student (engineering, economics, business)**
+- Evidence: AI use reaches about 96% in engineering (h_da 2025). Exams are the top stressor (49%, TK 2026). 34% juggle study and work (TK 2026).
+- Pains: too much material before the exam period, materials spread across LMS, PDFs and notes, and too little time.
+- Decision criteria (**Interpretation**): free or very cheap, fast results right before exams, works on phone and laptop.
+
+**B. International / English-taught Master student**
+- Evidence: about 402,000 international students (DAAD). English-taught programmes are growing (HRK).
+- Pains (**Interpretation, not surveyed**): mixed German/English material, unfamiliar university systems, heavy self-study load.
+- Decision criteria (**Interpretation**): bilingual handling, clear data protection, low price.
+
+**C. Thesis / research-phase student** (Master or late Bachelor)
+- Evidence: AI is used less for literature research than for getting into topics (Konstanz survey).
+- Pains (**Interpretation**): keeping track of sources and notes over months, linking ideas to citations.
+
+**Budget context:** in the 22nd Sozialerhebung (survey summer 2021, published 2023), more than one third of students had less than €800 per month and average rent was €410 (Deutsches Studierendenwerk: https://www.studierendenwerke.de/themen/hochschulpolitik/sozialerhebung). **This data is from 2021 and is likely outdated after inflation.** Direct data on students' willingness to pay for study apps in Germany: **Not publicly verified / Data not found.**
+
+**Buying process:** B2C self-serve download and freemium upgrade (**Interpretation**, based on how all the competitors above are priced). B2B procurement at universities runs through IT centres and data-protection officers, as the Chat AI and HAWKI rollouts show. Detailed procurement timelines: **Data not found**.
+
+## 4. Market-entry Barriers and Opportunities
+
+### Barriers
+1. **Copyright on lecture materials.** University guidance says that uploading third-party works (slides, scripts, videos) to AI systems most likely counts as reproduction under § 16 UrhG, and that proprietary AI systems send the data to external servers (HOOU@HAW: https://learn.hoou.de/pluginfile.php/26961/mod_page/content/9/KI.pdf; HAW Hamburg FAQ 2026: https://www.haw-hamburg.de/fileadmin/ASD/News/2026/260428_Code_of_Conduct/Medienkompetenz_in_der_Lehrveranstaltung_Was_d%C3%BCrfen_Lehrende_und_Studierende_Skripte_FAQ.pdf). Hochschule München advises asking lecturers before uploading their materials to AI tools (https://mediapool.hm.edu/media/fk10/fk10_lokal/relaunch_3/studierende_7/sonstiges_15/Compliance_im_Studium.pdf). A Uni Bamberg course policy template forbids uploading copyrighted course material to cloud AI without explicit permission (https://www.uni-bamberg.de/fileadmin/migfor/ki-richtlinie-fuer-meine-lehrveranstaltung.html). Uni Regensburg, on the other hand, lists summarising slides and generating quizzes as a learning use, subject to course rules (https://www.uni-regensburg.de/informatik-data-science/fakultaet/einrichtungen/medieninformatik/studium/ki-richtlinien). **This is a material legal risk and needs specialist legal review before launch.**
+2. **Data protection expectations (DSGVO).** Universities explicitly market their own AI as "GDPR-compliant" and hosted in Germany (sources in 1.4). **Interpretation:** students and institutions will compare any new app with those free, approved tools.
+3. **Free, strong alternatives.** Notion (free Plus for students), Obsidian (free), Capacities (free plan), NotebookLM (free for education institutions), and university Chat AI. **Interpretation:** willingness to pay will be the main commercial risk.
+4. **EU AI Act.** Features that evaluate learning outcomes or assess a student's level could fall under the Annex III high-risk categories (AI Act Service Desk, link in 1.4). **Interpretation:** a self-study tool for the student's own use is likely outside scope, but "grading" or "level placement" features should be avoided or reviewed by a lawyer.
+
+### Opportunities
+1. **Gap between chat and knowledge base.** Students use AI daily but mostly for ad-hoc questions (CHE, Konstanz). **Interpretation:** a tool that builds a persistent, linked semester knowledge base fills an unmet need.
+2. **Exam-driven pull.** Exams are the top stressor (TK 2026), so there is a clear moment of urgency each semester.
+3. **Trust as a differentiator.** Copyright and GDPR worries (section 4) can be turned into a selling point: EU processing, private by default, no model training on user content, and no public sharing of lecture material.
+4. **LMS integration later.** Moodle says it is used as the central platform at more than 180 German institutions, serving over 1.5 million students (Moodle Docs, undated: https://docs.moodle.org/402/de/Moodle_an_Hochschulen). ILIAS is also widespread (Uni Tübingen: https://uni-tuebingen.de/en/45712). About 90% of institutions use open-source LMS (netzpolitik.org, 2020: https://netzpolitik.org/2020/gemeinsame-erklaerung-der-open-source-bildungsplattformen-lernplattformen-fordern-nachhaltige-finanzierung/, **older data**).
+5. **University AI skills gap.** Students are rather dissatisfied with their university's AI skills offering (CHE) and rarely feel supported (Konstanz). **Interpretation:** onboarding content on good AI study practice could help win adoption.
+
+## 5. Key Sources
+- Destatis, press release 401, 16 Nov 2026 (student count): https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/11/PD26_401_213.html
+- DAAD, Wissenschaft weltoffen 2025 (international students): https://www.daad.de/de/pressemitteilungen/2025/erneut-hohe-zahl-internationaler-studierender-in-deutschland/
+- von Garrel & Mayer, Hochschule Darmstadt, 2025 (AI use longitudinal study): https://opus4.kobv.de/opus4-h-da/frontdoor/deliver/index/docId/533/file/gpt-dokumentation-final-jvg.pdf
+- CHE DatenCHECK 2025 (AI use frequency): https://idw-online.de/de/news853668
+- Studierendensurvey Konstanz, WS 2024/25: https://kops.uni-konstanz.de/server/api/core/bitstreams/8d6d5461-fb3d-4a09-abde-4f47e4f3832e/content
+- TK-Dossier 2026, 10 Jun 2026 (stress): https://www.tk.de/presse/themen/praevention/gesundheitsstudien/stressbelastung-bei-studierenden-auf-hohem-niveau-2218636
+- Deutsches Studierendenwerk, 22. Sozialerhebung (2021 data): https://www.studierendenwerke.de/themen/hochschulpolitik/sozialerhebung
+- HOOU@HAW legal guidance on uploading lecture material: https://learn.hoou.de/pluginfile.php/26961/mod_page/content/9/KI.pdf
+- Competitor pages: Notion pricing https://www.notion.com/pricing ; Obsidian pricing https://obsidian.md/pricing ; Capacities student discount https://docs.capacities.io/more/discount ; NotebookLM for education https://edu.google.com/intl/ALL_uk/ai-notebooklm/ ; Knowunity (tech.eu) https://tech.eu/2025/06/13/knowunity-raises-eur27m-to-bring-ai-tutor-to-1-billion-students/
+- EU AI Act Service Desk, education: https://ai-act-service-desk.ec.europa.eu/en/education-and-vocational-training
+
+## 6. Evidence Gaps and Assumptions
+1. **Willingness to pay** of German university students for an AI study / PKM app: no data found. This drives the business model. Validate with interviews and price tests.
+2. **Usage share of Notion, Obsidian, Capacities and NotebookLM among German university students:** no data found.
+3. **Knowunity and StudySmarter university-level penetration in Germany:** not verified. Their user figures are global and/or self-reported.
+4. **Legal status of uploading lecture slides to a private, EU-hosted, no-training AI tool:** guidance varies between institutions. Needs legal advice.
+5. **AI Act Digital Omnibus dates:** taken from secondary sources. Verify against the Official Journal of the EU.
+6. **Student budget data** dates from 2021. Newer national figures were not found in this research.
+7. **Assumption:** the product is a new B2C app, with a possible B2B2C route through universities later. No budget, team or existing product capabilities were given.
+
+</script>
+<script type="text/markdown" id="md-strategy" data-label="02 · Strategy" data-file="02-strategy.md">
+# Strategic Positioning: AI Second Brain App for University Students in Germany
+
+Working product name: **Semesterhirn** (placeholder; needs trademark and domain checks). All numbers refer to `01-research.md`. Product capabilities below are **design commitments for the product to be built**, not existing features.
+
+## 1. Product Positioning
+
+**Positioning statement**
+For university students in Germany who face exam periods with material scattered across slides, PDFs and notes, Semesterhirn is a private AI second brain that turns each course into a connected, source-linked knowledge base and exam plan. Unlike general chatbots, it keeps knowledge across the whole semester. Unlike Notion or Obsidian, it organises itself around courses and exams. And unlike content-sharing study apps, it keeps lecture material private, processed in the EU and never used for model training.
+
+**Core positioning sentence:** *The private AI second brain that turns your semester into an exam-ready knowledge base.*
+
+**Why this position follows from the research**
+- AI adoption is already near-universal (about 92%, h_da 2025), but usage is ad-hoc chat (CHE 2025, Konstanz WS 2024/25). The value is in *persistence and structure*, not "access to AI", which universities and Google already give away for free.
+- Exams are the top stressor (49%, TK 2026). That makes exam readiness the outcome to sell. "Knowledge management" is the mechanism, not the message.
+- Copyright guidance on uploading lecture material and GDPR expectations are real barriers. Making privacy the default turns a barrier into a reason to choose the product.
+
+## 2. Priority Target Segments
+
+**Segment 1 (primary): exam-heavy Bachelor students in engineering, economics and business at large universities and universities of applied sciences.**
+- Rationale: the highest AI usage (engineering about 96%, h_da 2025), exam pressure is the top stressor (TK 2026), and 34% combine study and work, so time-saving matters (TK 2026).
+- Entry moment: the 4 to 6 weeks before the winter exam period and the summer exam period.
+
+**Segment 2 (secondary): international and English-taught Master students.**
+- Rationale: about 402,000 international students (DAAD 2025) and a growing number of English-taught programmes (HRK). Bilingual DE/EN handling is a plausible differentiator.
+- **Insufficient evidence:** their specific pains and willingness to pay were not found in surveys. Next step: 10 interviews in this segment before committing marketing budget.
+
+**Deliberately not prioritised now:** school pupils (Knowunity's stronghold) and university B2B licensing (procurement processes **Data not found**; revisit after B2C traction).
+
+## 3. Differentiation Strategy
+
+| Versus | Their strength | Our defensible difference |
+|---|---|---|
+| Notion | Flexible workspace, free Plus for students | No setup needed: the structure is course > lecture > concept > exam. Full AI included in the student plan (Notion's free student plan only has an AI trial, per notion.com) |
+| Obsidian | Local, free, private | Same privacy promise without plugin and setup work. Built-in AI that is grounded in the student's own material |
+| Capacities (closest rival) | German, object-based PKM, student discount | Built for studying, not for general PKM: exam plans, source-linked review questions, semester timeline |
+| NotebookLM | Free, strong source-grounded AI | One connected base across all courses and semesters instead of separate notebooks. EU processing and a German/EU contract partner (**to be implemented and verified**) |
+| StudySmarter / Knowunity | Big user bases, shared content | Private by default: no public sharing of lecturers' material, which fits university copyright guidance |
+| University Chat AI / HAWKI | Free, approved by the institution | Persistent personal knowledge base. Later, an option to use the university's own models as the backend (partnership hypothesis) |
+
+**Defensible points (to build and prove):**
+1. **Trust architecture:** EU hosting, no training on user content, private by default, export to Markdown. Only claim this publicly once it is implemented and documented in a DPA / privacy policy.
+2. **Semester data model:** knowledge that compounds across lectures and semesters. Switching costs grow over time.
+3. **Citations to the source page:** every AI answer and review question links back to the slide or page it came from. This supports honest AI use, which universities ask for.
+
+**Explicitly avoided:** grading, predicting grades and level placement (possible EU AI Act Annex III high-risk categories), and public sharing of uploaded materials.
+
+## 4. Go-to-market Plan
+
+**Business model hypothesis (Insufficient evidence on pricing):** freemium. Free tier with one active course; paid "Semester" tier with unlimited courses and more AI usage. Benchmark corridor for tests: competitors' student prices (Obsidian Sync $4/month annually with 40% off for students; Capacities Pro 40% off for students). Run price tests rather than fixing a price now.
+
+**Phase 0: Validation (Dec 2026 to Feb 2027)**
+- 20 problem interviews (12 in Segment 1, 8 in Segment 2) at 2 to 3 universities.
+- Landing page with waitlist (this prototype) and a fake-door price test with 2 to 3 price points.
+- Legal check: copyright of uploading lecture material to a private, EU-hosted, no-training tool, and AI Act scope.
+- Milestone: decide go / no-go based on waitlist conversion and interview evidence. Set the thresholds before launch. **No benchmark found in the research.**
+
+**Phase 1: Closed beta, summer semester 2027**
+- 2 to 3 pilot universities. Recruit through student councils (Fachschaften), course tutors and student ambassadors.
+- Onboarding content: "using AI well for studying", tying into the university AI skills gap (CHE 2025, Konstanz).
+- Milestones: activation (a first course with materials and a first review session), week-4 retention, and share of users active in the exam weeks.
+
+**Phase 2: Paid launch, winter semester 2027/28 exam season**
+- Turn on paid plans before the winter exam period. Referral loop within the same course: one student invites classmates, but without sharing the lecturer's material.
+- Milestones: free-to-paid conversion, retention into a second semester.
+
+**Phase 3 (conditional): university partnerships**
+- Only after B2C traction: Moodle/ILIAS integration and the option to use university-hosted models (GWDG / HAWKI ecosystem). **Insufficient evidence** on procurement; research first.
+
+**Channel assumptions (to be tested; no channel data was found in the research):** campus ambassadors and Fachschaften, short-form social video around exam periods, and partnerships with university AI and learning-support centres.
+
+## 5. Assumptions and Open Questions
+1. Students will pay for persistence and structure when free chat AI exists. **Main risk, unvalidated.**
+2. A private, EU-hosted, no-training setup makes uploading lecture slides acceptable under German copyright law. **Requires legal review.**
+3. Bilingual DE/EN is a real pain point for Segment 2. **Unvalidated.**
+4. Product name "Semesterhirn" is available. **Not checked.**
+5. Team, budget and technical stack are unknown. The plan assumes a small team that can ship a web app plus a mobile companion.
+6. Open question for the user: is the goal an academic case study, a real startup idea or a course deliverable? That changes how deep the validation phase should go.
+
+</script>
+<script type="text/markdown" id="md-copy" data-label="03 · Copywriting" data-file="03-copywriting.md">
+# Marketing Copy: Semesterhirn (working name)
+
+Tone: benefit-led, calm, student-to-student, honest about the beta status. The product is not built yet. That's why the copy speaks in terms of "what we are building" and "our commitments", and why privacy claims are worded as commitments until they are implemented and documented (see `02-strategy.md`, section 3). No user numbers, testimonials, time-savings figures or grade promises.
+
+## Slogan
+**Your semester, connected.**
+
+## Landing-page Copy
+
+### Hero
+- **Headline:** Your semester, connected.
+- **Subheadline:** Semesterhirn is the private AI second brain that turns your lectures, slides and notes into one exam-ready knowledge base, organised by course and linked to its sources.
+- **Primary CTA button:** Join the beta waitlist
+- **Microcopy under CTA:** Free during the beta. Planned launch for selected universities in summer semester 2027.
+
+### Core Benefits
+
+**1. One brain for every course**
+Stop hunting through LMS folders, PDFs and notebooks. Semesterhirn organises everything by course, lecture and concept, and connects ideas across lectures and semesters, so your knowledge builds up instead of resetting each term.
+
+**2. Exam-ready, not just organised**
+Set your exam dates, and Semesterhirn builds a review plan from your own material, with questions that focus on what you haven't reviewed yet. Built for the weeks when it matters most.
+
+**3. Every answer shows its source**
+Ask questions about your material and get answers that link back to the exact slide or page. You can check every answer, cite properly and use AI the way your university expects.
+
+**4. Private by design**
+Our commitments for launch: processing in the EU, no training of AI models on your content, no public sharing of your lecturers' material, and full export to Markdown. Your notes stay yours.
+
+### CTA
+- **Section headline:** Be ready before the next exam season.
+- **Body:** We're opening a closed beta at selected German universities. Join the waitlist and help shape a study tool built for how you actually learn.
+- **Button:** Join the beta waitlist
+- **Form fields:** university email, study programme (optional)
+- **Fine print:** We'll only use your email to contact you about the beta. You can unsubscribe at any time.
+
+## Presentation Talking Points
+1. **Problem:** AI is already part of studying in Germany. About 92% of students use AI tools (Hochschule Darmstadt, 2025), and a quarter use them daily (CHE, 2025). But most use is ad-hoc chat, so knowledge disappears after each conversation.
+2. **Problem:** Exams are the number one source of stress for students (49%, TK-Dossier 2026), and material is spread across slides, PDFs and notes.
+3. **Solution:** Semesterhirn is a private AI second brain that turns a semester into a connected knowledge base organised by course, lecture and concept.
+4. **Solution:** It builds an exam review plan from the student's own material, and every answer and question links back to its source page.
+5. **Differentiation:** Unlike Notion or Obsidian, there is nothing to set up. Unlike NotebookLM, there is one base across all courses and semesters. Unlike content-sharing study apps, lecture material stays private.
+6. **Differentiation:** Trust is part of the product design: EU processing, no training on user content and full export. These are launch commitments to be verified in the privacy documentation.
+7. **Benefit:** Students walk into exam season with a structured, source-checked knowledge base instead of scattered files, and they keep it for the next semester.
+8. **Next step:** 20 student interviews, a waitlist and price test, and a legal review before a closed beta in summer semester 2027.
+
+</script>
+<script type="text/markdown" id="md-qa1" data-label="05 · QA round 1" data-file="05-qa-report.md">
+# QA Report (round 1)
+
+Audited file: `04-prototype/index.html`. The QA role did not modify the prototype.
+Method: automated tag-balance and anchor check (Python html.parser), a scan for external URLs, placeholders and dashes, headless Chromium rendering at 1280x900 and 390x844 (Playwright, full-page screenshots), a horizontal-overflow check, and a functional form test with invalid and valid input. Copy was compared line by line against `03-copywriting.md` and `02-strategy.md`.
+
+## [MUST FIX]
+1. **Hero illustration, central node label "Microeconomics" is clipped.** In both the desktop and mobile renders, the text is wider than the 46px-radius circle, so it reads as "icroeconomic". This is a visible defect in the hero, the most prominent part of the page. **Fix:** use a shorter label (e.g. "Micro-econ") or a larger circle, or reduce the font size so the text fits inside the node.
+2. **Hero illustration, "Review queue" sub-label overflows the "Exam plan" node** on desktop. White text runs past the orange circle onto the white card, where it is unreadable. **Fix:** shorten it (e.g. "Reviews") or enlarge the node.
+
+## [SHOULD IMPROVE]
+1. **Language:** the page is English-only, but the main segment (Segment 1) is German Bachelor students. Strategy plans for DE/EN. Before any real waitlist test, add a German version or a DE/EN toggle.
+2. **Fine print vs. demo banner:** "We'll only use your email to contact you about the beta" describes future data handling, while the page states it sends no data. That's acceptable for a demo, but for a live test, replace it with a real privacy notice (DSGVO, Impressum) and a working form backend.
+3. **Small SVG text on mobile:** node labels render at roughly 6 to 7 CSS px at a 390px width. Consider a simplified illustration or a larger viewBox scale on small screens.
+4. **Mobile navigation is hidden below 480px.** That's acceptable for a single-page demo because the CTA is above the fold, but a small anchor menu would help.
+5. **Privacy card spacing:** the closing line "Your notes stay yours." sits right under the list with no top margin. Add a little spacing.
+
+## [PASS] Checks
+- HTML structure: no unclosed or mismatched tags, no duplicate ids, and `lang`, `charset` and viewport meta are present.
+- Semantic elements: `header`, `nav`, `main`, `section`, `article`, `footer` are used.
+- Self-contained: no external URLs, fonts, images or frameworks. CSS and a small JS block are embedded.
+- Links: all 5 anchor links (#top, #benefits, #privacy, #waitlist x2) resolve to existing ids. No empty links.
+- No unreplaced placeholders (lorem, TODO, TBD) were found.
+- Responsive: there is no horizontal overflow at 1280px or 390px. Grid switches to one column at 820px or less.
+- CTA: visible in the hero and in a dedicated section. The form rejects an invalid email with a message and confirms a valid one with an honest "prototype, nothing sent" message (status uses `role="status"` / `aria-live`).
+- Copy consistency: the slogan, subheadline, 4 benefits, CTA headline, body, button, form fields and fine print match `03-copywriting.md` word for word. There are no user numbers, testimonials or grade promises. Privacy points are framed as "commitments for launch", in line with strategy section 3.
+- Honesty: the demo banner, the illustration caption ("Example content, not real user data") and the footer all make the prototype status clear.
+- Accessibility basics: visible focus styles, form labels tied to inputs, a reduced-motion media query, and an SVG with a `title`.
+
+## Overall Delivery Assessment
+**Not passed.** There are 2 MUST FIX issues, both clipped or overflowing labels in the hero illustration. Everything else is structurally sound, consistent with strategy and copy, and honest about the prototype status. Correction round 1 is required.
+
+</script>
+<script type="text/markdown" id="md-qa2" data-label="05 · QA round 2" data-file="05-qa-report-v2.md">
+# QA Report (round 2, after correction round 1)
+
+Audited file: `04-prototype/index.html`, as fixed by the Developer role. The QA role did not modify the file.
+Method: the same structural checks as round 1, plus a geometric fit check of every SVG label (rendered text bounding box vs. node radius, Chromium getBBox) and a visual re-render of the hero illustration at 1280px.
+
+## Changes made by the Developer (scope check)
+- The central node label "Microeconomics" (14px) was changed to "Micro-econ" (13px).
+- The Exam plan sub-label "Review queue" was changed to "Reviews".
+- No other lines changed. Strategy and copy content are untouched (the illustration labels are example content, not approved copy).
+
+## [MUST FIX]
+None remaining.
+- Round-1 item 1 (clipped "Microeconomics"): **Resolved.** "Micro-econ" is 73.8px wide inside a 46px-radius node and fits.
+- Round-1 item 2 ("Review queue" overflow): **Resolved.** "Reviews" is 39.6px wide inside a 34px-radius node and fits.
+- All 10 SVG labels pass the fit check.
+
+## [SHOULD IMPROVE]
+Carried over from round 1, still open (none of these block the demo):
+1. Add a German version or a DE/EN toggle before running a real waitlist test with Segment 1.
+2. Replace the demo fine print with a real DSGVO privacy notice, an Impressum and a working form backend before collecting any real data.
+3. SVG labels are small on a 390px screen. Simplify or scale the illustration on mobile.
+4. Add a compact anchor menu for screens narrower than 480px.
+5. Add spacing above "Your notes stay yours." in the privacy card.
+
+## [PASS] Checks
+- Tag balance, duplicate ids, anchors (5/5 resolve), no external resources, no placeholders: **pass** (re-run).
+- Responsive layout, CTA visibility and form behaviour: unchanged since the round-1 pass.
+- Copy and strategy consistency: unchanged since the round-1 pass.
+
+## Overall Delivery Assessment
+**Passed as a concept demonstrator.** There are 0 MUST FIX issues after one correction round. The page is suitable for internal review and presentation. It is **not** ready for a live waitlist test until SHOULD IMPROVE items 1 and 2 are done (German localisation and a legally compliant data-collection setup).
+
+</script>
+
+<script>
+(function () {
+  var tabs = document.getElementById('tabs'), doc = document.getElementById('doc');
+  var blocks = [].slice.call(document.querySelectorAll('script[type="text/markdown"]'));
+  function show(key, scroll) {
+    blocks.forEach(function (b) {
+      var k = b.id.slice(3);
+      var btn = tabs.querySelector('[data-k="' + k + '"]');
+      if (btn) btn.classList.toggle('on', k === key);
+      if (k === key) {
+        var md = b.textContent;
+        doc.innerHTML = (window.marked ? marked.parse(md) : '<pre style="white-space:pre-wrap">' + md.replace(/</g, '&lt;') + '</pre>') +
+          '<span class="file">' + b.dataset.file + '</span>';
+        doc.querySelectorAll('a[href^="http"]').forEach(function (a) { a.target = '_blank'; a.rel = 'noopener'; });
+      }
+    });
+    document.querySelectorAll('.step').forEach(function (s) { s.classList.toggle('on', s.dataset.doc === key); });
+    if (scroll) document.getElementById('docs').scrollIntoView({ behavior: 'smooth' });
+  }
+  blocks.forEach(function (b) {
+    var k = b.id.slice(3), btn = document.createElement('button');
+    btn.textContent = b.dataset.label; btn.dataset.k = k;
+    btn.onclick = function () { show(k, false); };
+    tabs.appendChild(btn);
+  });
+  document.querySelectorAll('.step').forEach(function (s) {
+    s.onclick = function () {
+      if (s.dataset.doc === 'proto') { document.getElementById('proto').scrollIntoView({ behavior: 'smooth' }); return; }
+      show(s.dataset.doc, true);
+    };
+  });
+  show('review', false);
+})();
+</script>
+</body>
+</html>
