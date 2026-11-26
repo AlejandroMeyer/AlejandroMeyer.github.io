@@ -44,3 +44,6 @@ unit6_5:Grok bot
 unit6_6:Claude duet
 unit6_7:Extra Credit Challenge
 unit6_8:Cue! AI video: Ancient Wuxia Flying Sword (Extra Credit)
+unit6_9:Extra Credit Challenge
+unit6_10:Extra Credit Challenge
+unit6_11:FINAL PROJECT
